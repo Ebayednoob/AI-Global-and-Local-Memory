@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Personal Memory Vault GUI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb { background: #888; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #555; }
+        .toast {
+            position: fixed; bottom: 20px; right: 20px; padding: 12px 20px;
+            border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            font-size: 0.875rem; z-index: 1050; opacity: 0;
+            transform: translateY(20px);
+            transition: opacity 0.3s ease, transform 0.3s ease;
+        }
+        .toast.show { opacity: 1; transform: translateY(0); }
+        .toast-success { background-color: #28a745; color: white; }
+        .toast-error { background-color: #dc3545; color: white; }
+        .toast-info { background-color: #17a2b8; color: white; }
+        .loading-spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1); border-left-color: #4f46e5;
+            border-radius: 50%; width: 24px; height: 24px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .avatar-preview {
+            width: 128px; height: 128px; border-radius: 50%;
+            object-fit: cover; background-color: #4a5568;
+            border: 3px solid #6366f1;
+        }
+        .tab-button.active { color: #818cf8; border-color: #6366f1; }
+        .input-group { position: relative; }
+        .toggle-password {
+            position: absolute; top: 50%; right: 12px; 
+            transform: translateY(-50%); cursor: pointer; color: #9ca3af;
+        }
+        .toggle-password:hover { color: #e5e7eb; }
+        #loginScreen, #mainAppScreen { transition: opacity 0.5s ease-in-out; }
+
+        /* Modal Styles */
+        .modal-backdrop {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(0,0,0,0.5); display: flex;
+            justify-content: center; align-items: center; z-index: 1040;
+            opacity: 0; visibility: hidden; transition: opacity 0.3s ease, visibility 0s 0.3s;
+        }
+        .modal-backdrop.show { opacity: 1; visibility: visible; transition: opacity 0.3s ease; }
+        .modal-content {
+            background-color: #2d3748;padding: 20px; border-radius: 8px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 90%; max-width: 500px;
+            transform: scale(0.95); transition: transform 0.3s ease;
+        }
+        .modal-backdrop.show .modal-content { transform: scale(1); }
+        .history-item {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 8px 0; border-bottom: 1px solid #4a5568;
+        }
+        .history-item:last-child { border-bottom: none; }
+        .history-key { word-break: break-all; margin-right: 10px; font-size: 0.8rem; }
+
+        /* Calendar Styles */
+        .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
+        .calendar-header { font-weight: bold; text-align: center; padding: 5px; color: #a0aec0; /* slate-400 */ }
+        .calendar-day {
+            padding: 10px 5px; border: 1px solid #4a5568; /* slate-700 */
+            text-align: center; cursor: pointer; min-height: 60px;
+            display: flex; flex-direction: column; justify-content: space-between;
+            font-size: 0.8rem;
+        }
+        .calendar-day:hover { background-color: #4a5568; /* slate-700 */ }
+        .calendar-day.other-month { color: #718096; /* slate-500 */ cursor: default; }
+        .calendar-day.selected-day { background-color: #6366f1; /* indigo-500 */ color: white; font-weight: bold; }
+        .calendar-day .day-number { font-size: 0.9rem; }
+        .calendar-day .note-indicator { font-size: 1.5rem; line-height: 1; color: #f6ad55; /* orange-400 */ }
+
+
+    </style>
+</head>
+<body class="bg-gradient-to-br from-slate-900 to-slate-800 text-slate-100 min-h-screen flex flex-col items-center justify-center p-4 selection:bg-indigo-500 selection:text-white">
+
+    <div id="loginScreen" class="w-full max-w-md bg-slate-800 shadow-2xl rounded-xl p-8 space-y-6">
+        <h1 class="text-3xl font-bold text-center text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-pink-500">Memory Vault Login</h1>
+        <div><label for="userDropdown" class="block text-sm font-medium text-slate-300 mb-1">Select User</label><select id="userDropdown" name="userDropdown" class="w-full bg-slate-700 text-slate-100 border-slate-600 rounded-lg p-3 focus:ring-2 focus:ring-indigo-500"><option value="">-- Select User --</option><option value="testuser">testuser (Demo)</option><option value="ADD_NEW_USER">--- Add New User ---</option></select></div>
+        <div id="newUserFields" class="hidden space-y-4"><div><label for="newUsername" class="block text-sm font-medium text-slate-300 mb-1">New Username</label><input type="text" id="newUsername" class="w-full bg-slate-700 p-3 rounded-lg"></div><div class="input-group"><label for="newPassword" class="block text-sm font-medium text-slate-300 mb-1">New Password</label><input type="password" id="newPassword" class="w-full bg-slate-700 p-3 pr-10 rounded-lg"><span class="toggle-password" onclick="togglePasswordVisibility('newPassword', 'newPasswordToggleIcon')"><svg id="newPasswordToggleIcon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /></svg></span></div></div>
+        <div id="existingUserPasswordSection" class="input-group"><label for="loginPassword" class="block text-sm font-medium text-slate-300 mb-1">Password</label><input type="password" id="loginPassword" value="testpass" class="w-full bg-slate-700 p-3 pr-10 rounded-lg"><span class="toggle-password" onclick="togglePasswordVisibility('loginPassword', 'loginPasswordToggleIcon')"><svg id="loginPasswordToggleIcon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /></svg></span></div>
+        <button type="button" id="loginOrRegisterBtn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 px-4 rounded-lg transition">Login</button>
+    </div>
+
+    <div id="mainAppScreen" class="hidden bg-slate-800 shadow-2xl rounded-xl p-6 md:p-10 w-full max-w-3xl">
+        <header class="mb-8 flex justify-between items-center">
+            <div><h1 class="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-pink-500">Personal Memory Vault</h1><p class="text-slate-400 mt-1">Logged in as: <span id="loggedInUserDisplay" class="font-semibold"></span></p></div>
+            <button type="button" id="logoutBtn" class="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg text-sm transition">Logout</button>
+        </header>
+        
+        <input type="hidden" id="userId" name="userId"> 
+        <div class="mb-6 border-b border-slate-700">
+            <nav class="flex space-x-1 sm:space-x-2 md:space-x-4 overflow-x-auto pb-1" aria-label="Tabs">
+                <button type="button" id="profileTabBtn" class="tab-button active text-slate-400 hover:text-indigo-300 whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm border-transparent">User Profile</button>
+                <button type="button" id="apiSettingsTabBtn" class="tab-button text-slate-400 hover:text-indigo-300 whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm border-transparent">API Settings</button>
+                <button type="button" id="calendarTabBtn" class="tab-button text-slate-400 hover:text-indigo-300 whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm border-transparent">Calendar</button>
+                <button type="button" id="memoriesTabBtn" class="tab-button text-slate-400 hover:text-indigo-300 whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm border-transparent">Memories</button>
+                <button type="button" id="llmTabBtn" class="tab-button text-slate-400 hover:text-indigo-300 whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm border-transparent">LLM Integration</button>
+            </nav>
+        </div>
+
+        <section id="profileSection" class="space-y-6">
+            <div class="flex flex-col sm:flex-row items-center sm:items-start gap-6">
+                <div class="flex-shrink-0">
+                    <img id="avatarPreview" src="https://placehold.co/128x128/4A5568/E2E8F0?text=Avatar" alt="User Avatar" class="avatar-preview">
+                    <label for="avatarFile" class="mt-2 cursor-pointer inline-block bg-slate-600 hover:bg-slate-500 text-slate-200 text-xs font-semibold py-2 px-3 rounded-md transition text-center w-full sm:w-auto">Change Avatar</label>
+                    <input type="file" id="avatarFile" name="avatarFile" class="hidden" accept="image/png, image/jpeg, image/gif">
+                </div>
+                <div class="flex-grow w-full space-y-4">
+                    <div><label for="displayName" class="block text-sm font-medium text-slate-300 mb-1">Display Name</label><input type="text" id="displayName" class="w-full bg-slate-700 p-3 rounded-lg"></div>
+                    <div><label for="bio" class="block text-sm font-medium text-slate-300 mb-1">Bio</label><textarea id="bio" rows="3" class="w-full bg-slate-700 p-3 rounded-lg"></textarea></div>
+                </div>
+            </div>
+            <div class="flex flex-col sm:flex-row gap-3">
+                <button type="button" id="saveProfileBtn" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3 px-4 rounded-lg transition flex items-center justify-center space-x-2">
+                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
+                    <span>Save Profile & Settings</span>
+                </button>
+            </div>
+        </section>
+
+        <section id="apiSettingsSection" class="hidden space-y-6">
+            <h2 class="text-2xl font-semibold text-slate-200 mb-4">API & Encryption Key Settings</h2>
+            <p class="text-sm text-slate-400 mb-4">These keys are stored in your browser. The "Vault API Key" must match the key configured on your backend server for memory operations.</p>
+            <div>
+                <label for="apiKey" class="block text-sm font-medium text-slate-300 mb-1">Current Vault API Key</label>
+                <div class="input-group">
+                    <input type="password" id="apiKey" name="apiKey" class="w-full bg-slate-700 text-slate-100 border-slate-600 rounded-lg p-3 pr-10 focus:ring-2 focus:ring-indigo-500" placeholder="your_secret_api_key" value="your_secret_api_key">
+                    <span class="toggle-password" onclick="togglePasswordVisibility('apiKey', 'apiKeyToggleIcon')">
+                        <svg id="apiKeyToggleIcon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /></svg>
+                    </span>
+                </div>
+                <div class="mt-2 space-x-2">
+                    <button type="button" id="generateApiKeyBtn" class="text-xs bg-sky-600 hover:bg-sky-700 text-white py-1 px-3 rounded-md">Generate New</button>
+                    <button type="button" id="manageApiKeyHistoryBtn" class="text-xs text-indigo-400 hover:text-indigo-300">Manage History</button>
+                </div>
+            </div>
+            <div>
+                <label for="encryptionKey" class="block text-sm font-medium text-slate-300 mb-1">Current Vault Encryption Key</label>
+                 <div class="input-group">
+                    <input type="password" id="encryptionKey" name="encryptionKey" class="w-full bg-slate-700 text-slate-100 border-slate-600 rounded-lg p-3 pr-10 focus:ring-2 focus:ring-indigo-500" placeholder="mysecret" value="mysecret">
+                    <span class="toggle-password" onclick="togglePasswordVisibility('encryptionKey', 'encryptionKeyToggleIcon')">
+                        <svg id="encryptionKeyToggleIcon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /></svg>
+                    </span>
+                </div>
+                <div class="mt-2 space-x-2">
+                    <button type="button" id="generateEncryptionKeyBtn" class="text-xs bg-sky-600 hover:bg-sky-700 text-white py-1 px-3 rounded-md">Generate New</button>
+                    <button type="button" id="manageEncKeyHistoryBtn" class="text-xs text-indigo-400 hover:text-indigo-300">Manage History</button>
+                </div>
+            </div>
+             <p class="text-xs text-slate-500 mt-4">Remember to click "Save Profile & Settings" in the User Profile tab to persist any generated or changed keys.</p>
+        </section>
+
+        <section id="calendarSection" class="hidden space-y-6">
+            <h2 class="text-2xl font-semibold text-slate-200 mb-4">Daily Notes Calendar</h2>
+            <div class="flex justify-between items-center mb-4">
+                <button type="button" id="prevMonthBtn" class="bg-slate-600 hover:bg-slate-500 text-white py-2 px-4 rounded-lg">&lt; Prev</button>
+                <h3 id="currentMonthYear" class="text-xl font-semibold text-slate-100">Month Year</h3>
+                <button type="button" id="nextMonthBtn" class="bg-slate-600 hover:bg-slate-500 text-white py-2 px-4 rounded-lg">Next &gt;</button>
+            </div>
+            <div class="calendar-header-row grid grid-cols-7 gap-1 text-center text-xs text-slate-400 mb-1">
+                <span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
+            </div>
+            <div id="calendarGrid" class="calendar-grid bg-slate-700/30 p-2 rounded-md"></div>
+            <div id="notesSectionForDay" class="mt-6 p-4 bg-slate-700/50 rounded-lg">
+                <h4 class="text-lg font-semibold text-slate-200 mb-2">Notes for <span id="selectedDateDisplay">No date selected</span>:</h4>
+                <div id="existingNotesDisplay" class="mb-3 p-2 bg-slate-800 rounded min-h-[60px] max-h-[150px] overflow-y-auto text-sm"><p class="text-slate-400">Select a day to view or add notes.</p></div>
+                <textarea id="dailyNoteTextarea" rows="4" class="w-full bg-slate-700 text-slate-100 border-slate-600 rounded-lg p-3 focus:ring-2 focus:ring-indigo-500" placeholder="Add your note for the selected day..."></textarea>
+                <button type="button" id="saveNoteAsMemoryBtn" class="mt-3 w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg transition">Save Note as Memory</button>
+            </div>
+        </section>
+
+        <section id="memoriesManagementSection" class="hidden space-y-6">
+            <div id="addMemorySection">
+                <h3 class="text-xl font-semibold text-slate-200 mb-3">Add New Memory (to Server)</h3>
+                 <div class="space-y-4">
+                    <div><label for="memoryData" class="block text-sm font-medium text-slate-300 mb-1">Memory Content</label><textarea id="memoryData" rows="4" class="w-full bg-slate-700 p-3 rounded-lg"></textarea></div>
+                    <div><label for="memoryMetadata" class="block text-sm font-medium text-slate-300 mb-1">Metadata (JSON)</label><input type="text" id="memoryMetadata" class="w-full bg-slate-700 p-3 rounded-lg" placeholder='{"source": "web"}' ></div>
+                    <button type="button" id="addMemoryBtn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 px-4 rounded-lg transition flex items-center justify-center space-x-2"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg><span>Add Memory</span></button>
+                </div>
+            </div>
+            <div id="getMemoriesActionSection">
+                 <h3 class="text-xl font-semibold text-slate-200 mb-3">View Memories (from Server)</h3>
+                <button type="button" id="getMemoriesBtn" class="w-full bg-pink-600 hover:bg-pink-700 text-white font-semibold py-3 px-4 rounded-lg transition flex items-center justify-center space-x-2"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /></svg><span>Get My Memories</span></button>
+            </div>
+        </section>
+
+        <section id="llmIntegrationSection" class="hidden space-y-6">
+            <h2 class="text-2xl font-semibold text-slate-200 mb-4">Gemini LLM Integration</h2>
+            <div class="input-group">
+                <label for="geminiApiKey" class="block text-sm font-medium text-slate-300 mb-1">Gemini API Key</label>
+                <input type="password" id="geminiApiKey" name="geminiApiKey" class="w-full bg-slate-700 text-slate-100 border-slate-600 rounded-lg p-3 pr-10 focus:ring-2 focus:ring-indigo-500" placeholder="Enter your Gemini API Key">
+                 <span class="toggle-password" onclick="togglePasswordVisibility('geminiApiKey', 'geminiApiToggleIcon')">
+                    <svg id="geminiApiToggleIcon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /></svg>
+                </span>
+                <p class="text-xs text-slate-400 mt-1">Note: For gemini-2.0-flash, an API key might not be strictly required. Leave blank to try without.</p>
+            </div>
+            <div><label for="llmPrompt" class="block text-sm font-medium text-slate-300 mb-1">Prompt</label><textarea id="llmPrompt" rows="5" class="w-full bg-slate-700 p-3 rounded-lg"></textarea></div>
+            <div class="flex flex-col sm:flex-row gap-3">
+                <button type="button" id="generateMemoryPromptBtn" class="flex-1 bg-teal-600 hover:bg-teal-700 text-white font-semibold py-3 px-4 rounded-lg transition flex items-center justify-center space-x-2"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" /></svg><span>Generate Memory Summary Prompt</span></button>
+                <button type="button" id="sendToLlmBtn" class="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 px-4 rounded-lg transition flex items-center justify-center space-x-2"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" d="M8.625 9.75a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375m-13.5 3.01c0 1.6 1.123 2.994 2.707 3.227 1.087.16 2.185.283 3.293.369V21l4.184-4.183a1.14 1.14 0 0 1 .778-.332 48.154 48.154 0 0 0 5.434 0 1.14 1.14 0 0 1 .778.332L21 21v-2.185c1.108-.086 2.206-.209 3.293-.37a3.744 3.744 0 0 0 2.707-3.227V6.75A3.75 3.75 0 0 0 20.25 3H3.75A3.75 3.75 0 0 0 0 6.75v6.01Z" /></svg><span>Send to Gemini</span></button>
+            </div>
+            <div id="llmResponseArea" class="bg-slate-900/50 ring-1 ring-slate-700 p-4 rounded-lg min-h-[100px] max-h-[300px] overflow-y-auto text-sm whitespace-pre-wrap">LLM responses will appear here.</div>
+        </section>
+        
+        <section id="resultsSection" class="mt-8">
+            <h2 class="text-2xl font-semibold text-slate-200 mb-4">Vault Operation Results</h2>
+            <div id="loadingIndicator" class="hidden flex items-center justify-center my-4"><div class="loading-spinner"></div><p class="ml-2 text-slate-400">Loading...</p></div>
+            <div id="responseArea" class="bg-slate-900/50 ring-1 ring-slate-700 p-4 rounded-lg min-h-[100px] max-h-[300px] overflow-y-auto text-sm whitespace-pre-wrap">Vault server responses will appear here.</div>
+        </section>
+    </div>
+
+    <div id="apiKeyHistoryModal" class="modal-backdrop"> <div class="modal-content"><h3 class="text-xl font-semibold mb-4 text-slate-100">Vault API Key History</h3><div id="apiKeyHistoryList" class="max-h-60 overflow-y-auto mb-4"></div><button type="button" id="closeApiKeyHistoryModalBtn" class="w-full bg-slate-600 hover:bg-slate-500 text-white py-2 px-4 rounded-lg">Close</button></div></div>
+    <div id="encKeyHistoryModal" class="modal-backdrop"> <div class="modal-content"><h3 class="text-xl font-semibold mb-4 text-slate-100">Vault Encryption Key History</h3><div id="encKeyHistoryList" class="max-h-60 overflow-y-auto mb-4"></div><button type="button" id="closeEncKeyHistoryModalBtn" class="w-full bg-slate-600 hover:bg-slate-500 text-white py-2 px-4 rounded-lg">Close</button></div></div>
+
+    <div id="toastContainer"></div>
+    <footer class="text-center text-slate-500 mt-12 pb-6"><p>&copy; <span id="currentYear"></span> Personal Memory Vault.</p></footer>
+
+    <script>
+        // --- Start of Script ---
+        const VAULT_API_BASE_URL = 'http://127.0.0.1:5001';
+        const GEMINI_API_URL_TEMPLATE = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=";
+        const MAX_KEY_HISTORY = 3; 
+        const eyeIconSvg = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /></svg>`;
+        const eyeSlashIconSvg = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.98 8.223A10.477 10.477 0 0 0 1.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.451 10.451 0 0 1 12 4.5c4.756 0 8.773 3.162 10.065 7.498a10.522 10.522 0 0 1-4.293 5.774M6.228 6.228 3 3m3.228 3.228 3.65 3.65m7.894 7.894L21 21m-3.228-3.228-3.65-3.65m0 0a3 3 0 1 0-4.243-4.243m4.242 4.242L9.88 9.88" /></svg>`;
+        
+        const loginScreen = document.getElementById('loginScreen');
+        const mainAppScreen = document.getElementById('mainAppScreen');
+        const userDropdown = document.getElementById('userDropdown');
+        const newUserFields = document.getElementById('newUserFields');
+        const newUsernameInput = document.getElementById('newUsername');
+        const newPasswordInput = document.getElementById('newPassword');
+        const existingUserPasswordSection = document.getElementById('existingUserPasswordSection');
+        const loginPasswordInput = document.getElementById('loginPassword');
+        const loginOrRegisterBtn = document.getElementById('loginOrRegisterBtn');
+        const logoutBtn = document.getElementById('logoutBtn');
+        const loggedInUserDisplay = document.getElementById('loggedInUserDisplay');
+        const userIdInput = document.getElementById('userId'); 
+        
+        const apiKeyInput = document.getElementById('apiKey'); 
+        const encryptionKeyInput = document.getElementById('encryptionKey');
+        const generateApiKeyBtn = document.getElementById('generateApiKeyBtn');
+        const generateEncryptionKeyBtn = document.getElementById('generateEncryptionKeyBtn');
+        const manageApiKeyHistoryBtn = document.getElementById('manageApiKeyHistoryBtn');
+        const manageEncKeyHistoryBtn = document.getElementById('manageEncKeyHistoryBtn');
+        const apiKeyHistoryModal = document.getElementById('apiKeyHistoryModal');
+        const encKeyHistoryModal = document.getElementById('encKeyHistoryModal');
+        const apiKeyHistoryList = document.getElementById('apiKeyHistoryList');
+        const encKeyHistoryList = document.getElementById('encKeyHistoryList');
+        const closeApiKeyHistoryModalBtn = document.getElementById('closeApiKeyHistoryModalBtn');
+        const closeEncKeyHistoryModalBtn = document.getElementById('closeEncKeyHistoryModalBtn');
+
+        const profileSection = document.getElementById('profileSection');
+        const apiSettingsSection = document.getElementById('apiSettingsSection');
+        const calendarSection = document.getElementById('calendarSection'); 
+        const memoriesManagementSection = document.getElementById('memoriesManagementSection');
+        const llmIntegrationSection = document.getElementById('llmIntegrationSection');
+        const tabButtons = {
+            profile: document.getElementById('profileTabBtn'),
+            apiSettings: document.getElementById('apiSettingsTabBtn'),
+            calendar: document.getElementById('calendarTabBtn'), 
+            memories: document.getElementById('memoriesTabBtn'),
+            llm: document.getElementById('llmTabBtn')
+        };
+        const sections = {
+            profile: profileSection,
+            apiSettings: apiSettingsSection,
+            calendar: calendarSection, 
+            memories: memoriesManagementSection,
+            llm: llmIntegrationSection
+        };
+
+        const calendarGrid = document.getElementById('calendarGrid');
+        const currentMonthYearDisplay = document.getElementById('currentMonthYear');
+        const prevMonthBtn = document.getElementById('prevMonthBtn');
+        const nextMonthBtn = document.getElementById('nextMonthBtn');
+        const selectedDateDisplay = document.getElementById('selectedDateDisplay');
+        const existingNotesDisplay = document.getElementById('existingNotesDisplay');
+        const dailyNoteTextarea = document.getElementById('dailyNoteTextarea');
+        const saveNoteAsMemoryBtn = document.getElementById('saveNoteAsMemoryBtn');
+
+        let currentCalDate = new Date();
+        let selectedCalDate = null; 
+        let userMemoriesCache = []; 
+
+        const avatarPreview = document.getElementById('avatarPreview');
+        const avatarFileInput = document.getElementById('avatarFile');
+        const displayNameInput = document.getElementById('displayName');
+        const bioInput = document.getElementById('bio');
+        const saveProfileBtn = document.getElementById('saveProfileBtn');
+        const memoryDataInput = document.getElementById('memoryData');
+        const memoryMetadataInput = document.getElementById('memoryMetadata');
+        const addMemoryBtn = document.getElementById('addMemoryBtn');
+        const getMemoriesBtn = document.getElementById('getMemoriesBtn');
+        const geminiApiKeyInput = document.getElementById('geminiApiKey');
+        const llmPromptInput = document.getElementById('llmPrompt');
+        const generateMemoryPromptBtn = document.getElementById('generateMemoryPromptBtn'); 
+        const sendToLlmBtn = document.getElementById('sendToLlmBtn');
+        const llmResponseArea = document.getElementById('llmResponseArea');
+        const responseArea = document.getElementById('responseArea'); 
+        const loadingIndicator = document.getElementById('loadingIndicator');
+        const toastContainer = document.getElementById('toastContainer');
+        document.getElementById('currentYear').textContent = new Date().getFullYear();
+        const DEFAULT_AVATAR = 'https://placehold.co/128x128/4A5568/E2E8F0?text=Avatar';
+        const DEFAULT_VAULT_API_KEY = "your_secret_api_key";
+        const DEFAULT_VAULT_ENC_KEY = "mysecret";
+
+        function showLoading(area = 'vault') { 
+            loadingIndicator.classList.remove('hidden');
+            if (area === 'llm') { llmResponseArea.textContent = 'Processing...'; } 
+            else if (area === 'memorySummary') { llmPromptInput.value = 'Generating memory summary...';}
+            else if (area === 'calendarNotes') { existingNotesDisplay.innerHTML = '<p class="text-slate-400">Loading notes...</p>'; }
+        }
+        function hideLoading() { loadingIndicator.classList.add('hidden'); }
+        function showToast(message, type = 'success') {
+            const toast = document.createElement('div');
+            toast.className = `toast ${type === 'success' ? 'toast-success' : (type === 'error' ? 'toast-error' : 'toast-info')}`;
+            toast.textContent = message;
+            toastContainer.appendChild(toast);
+            toast.offsetHeight; 
+            toast.classList.add('show');
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+        function togglePasswordVisibility(inputId, iconId) {
+            const input = document.getElementById(inputId);
+            const icon = document.getElementById(iconId);
+            if (input.type === "password") { input.type = "text"; icon.innerHTML = eyeSlashIconSvg; } 
+            else { input.type = "password"; icon.innerHTML = eyeIconSvg; }
+        }
+
+        function switchTab(activeTabKey) {
+            Object.keys(tabButtons).forEach(key => {
+                const button = tabButtons[key];
+                const section = sections[key];
+                if (button && section) { // Add null check for safety
+                    button.classList.toggle('active', key === activeTabKey);
+                    section.classList.toggle('hidden', key !== activeTabKey);
+                } else {
+                    console.error(`Button or section missing for tab key: ${key}`);
+                }
+            });
+            if (responseArea) { // Add null check for safety
+                 responseArea.textContent = `${activeTabKey.charAt(0).toUpperCase() + activeTabKey.slice(1)} section active.`;
+            }
+            if (activeTabKey === 'calendar') { 
+                fetchAllUserMemoriesForCalendar(); 
+                renderCalendar();
+            }
+        }
+        
+        Object.keys(tabButtons).forEach(key => {
+            const buttonElement = tabButtons[key];
+            if (buttonElement) {
+                buttonElement.addEventListener('click', () => switchTab(key));
+            } else {
+                console.error(`Tab button for key '${key}' not found during initial listener setup. Expected ID: ${
+                    key === 'profile' ? 'profileTabBtn' :
+                    key === 'apiSettings' ? 'apiSettingsTabBtn' :
+                    key === 'calendar' ? 'calendarTabBtn' :
+                    key === 'memories' ? 'memoriesTabBtn' :
+                    key === 'llm' ? 'llmTabBtn' : 'UNKNOWN_ID_FOR_KEY_' + key
+                }`);
+            }
+        });
+
+
+        const USER_STORAGE_PREFIX = 'vaultUser_';
+        const ADD_NEW_USER_VALUE = 'ADD_NEW_USER';
+        function populateUserDropdown() {
+            userDropdown.innerHTML = '<option value="">-- Select User --</option>'; 
+            if (!localStorage.getItem(`${USER_STORAGE_PREFIX}testuser`)) {
+                 localStorage.setItem(`${USER_STORAGE_PREFIX}testuser`, JSON.stringify({ password: "testpass" }));
+            }
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key.startsWith(USER_STORAGE_PREFIX)) {
+                    const username = key.substring(USER_STORAGE_PREFIX.length);
+                    userDropdown.add(new Option(username, username));
+                }
+            }
+            userDropdown.add(new Option('--- Add New User ---', ADD_NEW_USER_VALUE));
+        }
+        userDropdown.addEventListener('change', function() {
+            const isAddingNew = this.value === ADD_NEW_USER_VALUE;
+            newUserFields.classList.toggle('hidden', !isAddingNew);
+            existingUserPasswordSection.classList.toggle('hidden', isAddingNew);
+            loginOrRegisterBtn.textContent = isAddingNew ? 'Register New User' : 'Login';
+            if (!isAddingNew && this.value) { newUsernameInput.value = ''; newPasswordInput.value = '';}
+        });
+        function handleLoginOrRegister() {
+            const selectedUser = userDropdown.value;
+            if (selectedUser === ADD_NEW_USER_VALUE) { 
+                const newUsername = newUsernameInput.value.trim(); const newPassword = newPasswordInput.value.trim();
+                if (!newUsername || !newPassword) { showToast('New username and password are required.', 'error'); return; }
+                if (localStorage.getItem(`${USER_STORAGE_PREFIX}${newUsername}`)) { showToast('Username already exists.', 'error'); return; }
+                localStorage.setItem(`${USER_STORAGE_PREFIX}${newUsername}`, JSON.stringify({ password: newPassword }));
+                showToast(`User '${newUsername}' registered! Please select to login.`, 'success');
+                populateUserDropdown(); userDropdown.value = newUsername; 
+                newUserFields.classList.add('hidden'); existingUserPasswordSection.classList.remove('hidden');
+                loginOrRegisterBtn.textContent = 'Login'; newUsernameInput.value = ''; newPasswordInput.value = '';
+            } else if (selectedUser) { 
+                const username = selectedUser; const password = loginPasswordInput.value.trim();
+                const userData = JSON.parse(localStorage.getItem(`${USER_STORAGE_PREFIX}${username}`));
+                if (userData && userData.password === password) { 
+                    localStorage.setItem('loggedInUser', username); showMainAppUI(username); loadProfileFromLocalStorage(username);
+                } else { showToast('Invalid username or password.', 'error');}
+            } else { showToast('Please select a user or choose to add a new one.', 'error');}
+        }
+        function showMainAppUI(username) {
+            loginScreen.classList.add('hidden'); mainAppScreen.classList.remove('hidden');
+            loggedInUserDisplay.textContent = username; userIdInput.value = username; 
+            switchTab('profile'); 
+            fetchAllUserMemoriesForCalendar(); 
+        }
+        function handleLogout() {
+            localStorage.removeItem('loggedInUser'); userMemoriesCache = []; 
+            loginScreen.classList.remove('hidden'); mainAppScreen.classList.add('hidden');
+            populateUserDropdown(); userDropdown.value = ""; loginPasswordInput.value = "";
+            apiKeyInput.value = DEFAULT_VAULT_API_KEY; encryptionKeyInput.value = DEFAULT_VAULT_ENC_KEY;
+            newUserFields.classList.add('hidden'); existingUserPasswordSection.classList.remove('hidden');
+            loginOrRegisterBtn.textContent = 'Login';
+        }
+        function checkLoginState() {
+            const loggedInUser = localStorage.getItem('loggedInUser');
+            populateUserDropdown(); 
+            if (loggedInUser) { showMainAppUI(loggedInUser); loadProfileFromLocalStorage(loggedInUser); } 
+            else {
+                loginScreen.classList.remove('hidden'); mainAppScreen.classList.add('hidden');
+                userDropdown.value = ""; newUserFields.classList.add('hidden');
+                existingUserPasswordSection.classList.remove('hidden'); loginOrRegisterBtn.textContent = 'Login';
+            }
+        }
+        loginOrRegisterBtn.addEventListener('click', handleLoginOrRegister);
+        logoutBtn.addEventListener('click', handleLogout);
+        function generateRandomKey() { return ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g, c => (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16)); }
+        generateApiKeyBtn.addEventListener('click', () => { apiKeyInput.value = generateRandomKey(); showToast('New Vault API Key generated. Save profile to persist.', 'info'); });
+        generateEncryptionKeyBtn.addEventListener('click', () => { encryptionKeyInput.value = generateRandomKey(); showToast('New Vault Encryption Key generated. Save profile to persist.', 'info'); });
+        function getProfileData(username) { const profileKey = `vaultUserProfile_${username}`; return JSON.parse(localStorage.getItem(profileKey)) || { apiSettings: { vaultApiKey: { current: DEFAULT_VAULT_API_KEY, history: [] }, vaultEncryptionKey: { current: DEFAULT_VAULT_ENC_KEY, history: [] } } }; }
+        function saveProfileData(username, profileData) { const profileKey = `vaultUserProfile_${username}`; localStorage.setItem(profileKey, JSON.stringify(profileData)); }
+        function loadProfileFromLocalStorage(username) {
+            const profileData = getProfileData(username);
+            displayNameInput.value = profileData.displayName || username; bioInput.value = profileData.bio || '';
+            avatarPreview.src = profileData.avatarBase64 || DEFAULT_AVATAR;
+            apiKeyInput.value = profileData.apiSettings?.vaultApiKey?.current || DEFAULT_VAULT_API_KEY;
+            encryptionKeyInput.value = profileData.apiSettings?.vaultEncryptionKey?.current || DEFAULT_VAULT_ENC_KEY;
+            renderKeyHistory('api', profileData.apiSettings?.vaultApiKey?.history || []);
+            renderKeyHistory('enc', profileData.apiSettings?.vaultEncryptionKey?.history || []);
+        }
+        saveProfileBtn.addEventListener('click', () => { 
+            const username = localStorage.getItem('loggedInUser'); if (!username) { showToast('Not logged in.', 'error'); return; }
+            let profileData = getProfileData(username);
+            profileData.apiSettings = profileData.apiSettings || {};
+            profileData.apiSettings.vaultApiKey = profileData.apiSettings.vaultApiKey || { current: DEFAULT_VAULT_API_KEY, history: [] };
+            profileData.apiSettings.vaultEncryptionKey = profileData.apiSettings.vaultEncryptionKey || { current: DEFAULT_VAULT_ENC_KEY, history: [] };
+            profileData.displayName = displayNameInput.value.trim(); profileData.bio = bioInput.value.trim();
+            profileData.avatarBase64 = avatarPreview.src.startsWith('data:image') ? avatarPreview.src : (profileData.avatarBase64 || null);
+            const newApiKey = apiKeyInput.value.trim();
+            if (newApiKey !== profileData.apiSettings.vaultApiKey.current) {
+                if (profileData.apiSettings.vaultApiKey.current && profileData.apiSettings.vaultApiKey.current !== newApiKey) { profileData.apiSettings.vaultApiKey.history.unshift(profileData.apiSettings.vaultApiKey.current); }
+                profileData.apiSettings.vaultApiKey.current = newApiKey;
+                profileData.apiSettings.vaultApiKey.history = profileData.apiSettings.vaultApiKey.history.filter(k => k !== newApiKey).slice(0, MAX_KEY_HISTORY);
+            }
+            const newEncKey = encryptionKeyInput.value.trim();
+            if (newEncKey !== profileData.apiSettings.vaultEncryptionKey.current) {
+                 if (profileData.apiSettings.vaultEncryptionKey.current && profileData.apiSettings.vaultEncryptionKey.current !== newEncKey) { profileData.apiSettings.vaultEncryptionKey.history.unshift(profileData.apiSettings.vaultEncryptionKey.current); }
+                profileData.apiSettings.vaultEncryptionKey.current = newEncKey;
+                profileData.apiSettings.vaultEncryptionKey.history = profileData.apiSettings.vaultEncryptionKey.history.filter(k => k !== newEncKey).slice(0, MAX_KEY_HISTORY);
+            }
+            saveProfileData(username, profileData);
+            renderKeyHistory('api', profileData.apiSettings.vaultApiKey.history); 
+            renderKeyHistory('enc', profileData.apiSettings.vaultEncryptionKey.history);
+            showToast('Profile & API Settings saved!', 'success');
+        });
+        avatarFileInput.addEventListener('change', function(event) {
+            const file = event.target.files[0]; if (file) { if (file.size > 2 * 1024 * 1024) { showToast('Avatar image is too large (max 2MB).', 'error'); avatarFileInput.value = ''; return; }
+            const reader = new FileReader(); reader.onload = (e) => { avatarPreview.src = e.target.result; }; reader.readAsDataURL(file); }
+        });
+        function renderKeyHistory(keyType, historyArray) {
+            const listElement = keyType === 'api' ? apiKeyHistoryList : encKeyHistoryList; listElement.innerHTML = ''; 
+            if (!historyArray || historyArray.length === 0) { listElement.innerHTML = '<p class="text-slate-400 text-sm">No history available.</p>'; return; }
+            historyArray.forEach((key, index) => {
+                const itemDiv = document.createElement('div'); itemDiv.className = 'history-item';
+                const keySpan = document.createElement('span'); keySpan.className = 'history-key text-slate-300'; keySpan.textContent = key;
+                const actionsDiv = document.createElement('div'); actionsDiv.className = 'space-x-2';
+                const useBtn = document.createElement('button'); useBtn.type = 'button'; useBtn.className = 'text-xs bg-green-600 hover:bg-green-700 text-white py-1 px-2 rounded'; useBtn.textContent = 'Use'; useBtn.onclick = () => useHistoricalKey(keyType, key);
+                const deleteBtn = document.createElement('button'); deleteBtn.type = 'button'; deleteBtn.className = 'text-xs bg-red-600 hover:bg-red-700 text-white py-1 px-2 rounded'; deleteBtn.textContent = 'Delete'; deleteBtn.onclick = () => deleteHistoricalKey(keyType, index);
+                actionsDiv.appendChild(useBtn); actionsDiv.appendChild(deleteBtn); itemDiv.appendChild(keySpan); itemDiv.appendChild(actionsDiv); listElement.appendChild(itemDiv);
+            });
+        }
+        function useHistoricalKey(keyType, keyValue) {
+            if (keyType === 'api') { apiKeyInput.value = keyValue; showToast('API Key field updated. Save profile to make it current.', 'info'); apiKeyHistoryModal.classList.remove('show');} 
+            else if (keyType === 'enc') { encryptionKeyInput.value = keyValue; showToast('Encryption Key field updated. Save profile to make it current.', 'info'); encKeyHistoryModal.classList.remove('show');}
+        }
+        function deleteHistoricalKey(keyType, index) {
+            const username = localStorage.getItem('loggedInUser'); if (!username) return; let profileData = getProfileData(username);
+            if (keyType === 'api' && profileData.apiSettings?.vaultApiKey?.history) { profileData.apiSettings.vaultApiKey.history.splice(index, 1); renderKeyHistory('api', profileData.apiSettings.vaultApiKey.history);} 
+            else if (keyType === 'enc' && profileData.apiSettings?.vaultEncryptionKey?.history) { profileData.apiSettings.vaultEncryptionKey.history.splice(index, 1); renderKeyHistory('enc', profileData.apiSettings.vaultEncryptionKey.history);}
+            saveProfileData(username, profileData); showToast('Key deleted from history.', 'success');
+        }
+        manageApiKeyHistoryBtn.addEventListener('click', () => apiKeyHistoryModal.classList.add('show'));
+        closeApiKeyHistoryModalBtn.addEventListener('click', () => apiKeyHistoryModal.classList.remove('show'));
+        manageEncKeyHistoryBtn.addEventListener('click', () => encKeyHistoryModal.classList.add('show'));
+        closeEncKeyHistoryModalBtn.addEventListener('click', () => encKeyHistoryModal.classList.remove('show'));
+        apiKeyHistoryModal.addEventListener('click', (e) => { if(e.target === apiKeyHistoryModal) apiKeyHistoryModal.classList.remove('show'); });
+        encKeyHistoryModal.addEventListener('click', (e) => { if(e.target === encKeyHistoryModal) encKeyHistoryModal.classList.remove('show'); });
+
+        // --- Calendar Logic ---
+        function renderCalendar() {
+            calendarGrid.innerHTML = ''; 
+            const year = currentCalDate.getFullYear(); const month = currentCalDate.getMonth(); 
+            currentMonthYearDisplay.textContent = `${currentCalDate.toLocaleString('default', { month: 'long' })} ${year}`;
+            const firstDayOfMonth = new Date(year, month, 1).getDay(); 
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            for (let i = 0; i < firstDayOfMonth; i++) { const emptyCell = document.createElement('div'); emptyCell.className = 'calendar-day other-month'; calendarGrid.appendChild(emptyCell); }
+            for (let day = 1; day <= daysInMonth; day++) {
+                const dayCell = document.createElement('div'); dayCell.className = 'calendar-day';
+                const dayNumberSpan = document.createElement('span'); dayNumberSpan.className = 'day-number'; dayNumberSpan.textContent = day; dayCell.appendChild(dayNumberSpan);
+                const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                dayCell.dataset.date = dateStr;
+                if (dateStr === selectedCalDate) { dayCell.classList.add('selected-day'); }
+                const notesForThisDay = userMemoriesCache.filter(mem => mem.metadata?.calendar_date === dateStr);
+                if (notesForThisDay.length > 0) { const noteIndicator = document.createElement('span'); noteIndicator.className = 'note-indicator'; noteIndicator.textContent = '●'; dayCell.appendChild(noteIndicator); }
+                dayCell.addEventListener('click', () => handleDayClick(dateStr, dayCell));
+                calendarGrid.appendChild(dayCell);
+            }
+        }
+        async function fetchAllUserMemoriesForCalendar() {
+            const currentUserId = userIdInput.value.trim(); const currentDecryptionKey = encryptionKeyInput.value.trim();
+            if (!currentUserId || !currentDecryptionKey || !apiKeyInput.value.trim()) { userMemoriesCache = []; renderCalendar(); return; }
+            showLoading('calendarNotes'); 
+            const endpoint = `/memory/${currentUserId}?decryption_key=${encodeURIComponent(currentDecryptionKey)}`;
+            try {
+                const responseData = await makeVaultApiCall(endpoint, 'GET'); 
+                userMemoriesCache = (responseData && responseData.memories) ? responseData.memories : [];
+            } catch (error) { userMemoriesCache = []; } 
+            finally { hideLoading(); renderCalendar(); if (selectedCalDate) { displayNotesForSelectedDate(); } }
+        }
+        function handleDayClick(dateStr, dayCellElement) {
+            if (selectedCalDate === dateStr) { 
+                selectedCalDate = null; selectedDateDisplay.textContent = "No date selected";
+                dailyNoteTextarea.value = ''; existingNotesDisplay.innerHTML = '<p class="text-slate-400">Select a day to view or add notes.</p>';
+            } else {
+                selectedCalDate = dateStr;
+                selectedDateDisplay.textContent = new Date(dateStr + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+                dailyNoteTextarea.value = ''; displayNotesForSelectedDate();
+            }
+            document.querySelectorAll('.calendar-day.selected-day').forEach(d => d.classList.remove('selected-day'));
+            if (selectedCalDate && dayCellElement) { dayCellElement.classList.add('selected-day'); }
+        }
+        function displayNotesForSelectedDate() {
+            if (!selectedCalDate) { existingNotesDisplay.innerHTML = '<p class="text-slate-400">Select a day to view or add notes.</p>'; return; }
+            const notes = userMemoriesCache.filter(mem => mem.metadata?.calendar_date === selectedCalDate);
+            if (notes.length > 0) {
+                existingNotesDisplay.innerHTML = notes.map(note => 
+                    `<div class="p-2 mb-1 bg-slate-700 rounded text-xs"><p class="font-semibold">${new Date(note.timestamp_created).toLocaleTimeString()}:</p><p class="whitespace-pre-wrap">${note.data}</p></div>`
+                ).join('');
+            } else { existingNotesDisplay.innerHTML = '<p class="text-slate-400">No notes for this day.</p>'; }
+        }
+        prevMonthBtn.addEventListener('click', () => { currentCalDate.setMonth(currentCalDate.getMonth() - 1); fetchAllUserMemoriesForCalendar(); });
+        nextMonthBtn.addEventListener('click', () => { currentCalDate.setMonth(currentCalDate.getMonth() + 1); fetchAllUserMemoriesForCalendar(); });
+        saveNoteAsMemoryBtn.addEventListener('click', async () => {
+            if (!selectedCalDate) { showToast('Please select a day on the calendar first.', 'error'); return; }
+            const noteContent = dailyNoteTextarea.value.trim(); if (!noteContent) { showToast('Note content cannot be empty.', 'error'); return; }
+            const currentEncryptionKey = encryptionKeyInput.value.trim(); if (!currentEncryptionKey) { showToast('Vault Encryption Key is required.', 'error'); return; }
+            if (!apiKeyInput.value.trim()) { showToast('Vault API Key is required.', 'error'); return; }
+            const memoryPayload = { data: noteContent, encryption_key: currentEncryptionKey, metadata: { source: "calendar_note", calendar_date: selectedCalDate, original_timestamp: new Date().toISOString() }};
+            const currentUserId = userIdInput.value.trim(); const endpoint = `/memory/${currentUserId}`;
+            const result = await makeVaultApiCall(endpoint, 'POST', memoryPayload);
+            if (result && result.memory_id) {
+                showToast('Note saved as memory!', 'success'); dailyNoteTextarea.value = ''; 
+                const newMemory = { memory_id: result.memory_id, data: noteContent, timestamp_created: result.timestamp_created, metadata: memoryPayload.metadata };
+                userMemoriesCache.push(newMemory); userMemoriesCache.sort((a,b) => new Date(a.timestamp_created) - new Date(b.timestamp_created)); 
+                displayNotesForSelectedDate(); renderCalendar(); 
+            } else { showToast('Failed to save note as memory.', 'error'); }
+        });
+
+        // --- Vault Memory API Calls (Backend Interaction) ---
+        async function makeVaultApiCall(endpoint, method = 'GET', body = null, isFormData = false) { /* ... */ }
+        addMemoryBtn.addEventListener('click', async () => { /* ... */ });
+        getMemoriesBtn.addEventListener('click', async () => { /* ... */ });
+        // (Copy existing implementations for makeVaultApiCall, addMemoryBtn, getMemoriesBtn)
+        async function makeVaultApiCall(endpoint, method = 'GET', body = null, isFormData = false) {
+            const currentUserId = userIdInput.value.trim(); 
+            const currentVaultApiKey = apiKeyInput.value.trim(); 
+            if (!currentUserId && !endpoint.includes('/uploads/avatars/')) { showToast('User ID for Vault is missing. Please log in again.', 'error'); return; }
+            if (!currentVaultApiKey && !endpoint.includes('/uploads/avatars/')) { showToast('Vault API Key is required.', 'error'); return; }
+            
+            showLoading('vault');
+            responseArea.textContent = 'Processing Vault request...';
+            const headers = {};
+            if (!isFormData) { headers['Content-Type'] = 'application/json'; }
+            if (currentVaultApiKey && !endpoint.includes('/uploads/avatars/')) { headers['X-API-KEY'] = currentVaultApiKey; }
+
+            const config = { method: method, headers: headers };
+            if (body) { config.body = isFormData ? body : JSON.stringify(body); }
+
+            try {
+                const response = await fetch(`${VAULT_API_BASE_URL}${endpoint}`, config);
+                const contentType = response.headers.get("content-type");
+                let responseData;
+                if (contentType && contentType.indexOf("application/json") !== -1) {
+                    responseData = await response.json();
+                } else if (response.ok && !contentType?.includes("application/json")) { return response; }
+                 else {
+                    if (!response.ok) {
+                         try { responseData = await response.json(); } 
+                         catch (e) { responseData = { error: `Server error: ${response.status} ${response.statusText}` }; }
+                    } else { responseData = { message: "Received non-JSON response from Vault.", status: response.status }; }
+                }
+                if (!response.ok) { throw new Error(responseData.error || responseData.message || `HTTP error! status: ${response.status}`); }
+                if (method !== 'GET' || (endpoint.startsWith("/memory") && !endpoint.includes("?decryption_key="))) { 
+                     responseArea.textContent = JSON.stringify(responseData, null, 2);
+                }
+                if (responseData.message && (method !== 'GET' || !endpoint.startsWith("/memory"))) {
+                     showToast(responseData.message, 'success');
+                } else if (method === 'GET' && endpoint.startsWith("/memory") && responseData.memories) {
+                     showToast(`Fetched ${responseData.memories.length} memories.`, 'success');
+                } else if (responseData.message) {
+                     showToast(responseData.message, 'success');
+                }
+                return responseData;
+            } catch (error) {
+                console.error('Vault API Call Error:', error);
+                responseArea.textContent = `Vault Error: ${error.message}`;
+                showToast(error.message || 'A Vault error occurred.', 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+        addMemoryBtn.addEventListener('click', async () => {
+            const memoryContent = memoryDataInput.value.trim();
+            const currentEncryptionKey = encryptionKeyInput.value.trim();
+            const metadataString = memoryMetadataInput.value.trim();
+            let metadata = {};
+            if (!memoryContent) { showToast('Memory content cannot be empty.', 'error'); return; }
+            if (!currentEncryptionKey) { showToast('Encryption Key is required for memory.', 'error'); return; }
+            if (metadataString) {
+                try { metadata = JSON.parse(metadataString); } 
+                catch (e) { showToast('Invalid JSON format for metadata.', 'error'); return; }
+            }
+            const currentUserId = userIdInput.value.trim(); 
+            const endpoint = `/memory/${currentUserId}`;
+            const body = { data: memoryContent, encryption_key: currentEncryptionKey, metadata: metadata };
+            const result = await makeVaultApiCall(endpoint, 'POST', body);
+            if (result) { memoryDataInput.value = ''; memoryMetadataInput.value = ''; fetchAllUserMemoriesForCalendar(); } 
+        });
+        getMemoriesBtn.addEventListener('click', async () => {
+            const currentUserId = userIdInput.value.trim(); 
+            const currentDecryptionKey = encryptionKeyInput.value.trim();
+            if (!currentDecryptionKey) { showToast('Decryption Key is required for memories.', 'error'); return; }
+            const endpoint = `/memory/${currentUserId}?decryption_key=${encodeURIComponent(currentDecryptionKey)}`;
+            const result = await makeVaultApiCall(endpoint, 'GET');
+            if(result && result.memories){ responseArea.textContent = JSON.stringify(result, null, 2); } 
+        });
+
+        // --- LLM Integration Functions ---
+        generateMemoryPromptBtn.addEventListener('click', async () => { /* ... */ });
+        sendToLlmBtn.addEventListener('click', async () => { /* ... */ });
+        // (Copy existing implementations for LLM functions)
+        generateMemoryPromptBtn.addEventListener('click', async () => {
+            const currentUserId = userIdInput.value.trim();
+            const currentDecryptionKey = encryptionKeyInput.value.trim();
+            if (!currentUserId) { showToast('Please log in to generate a memory summary.', 'error'); return; }
+            if (!currentDecryptionKey) { showToast('Vault Encryption Key is required to decrypt memories for summary.', 'error'); return; }
+            if (!apiKeyInput.value.trim()) { showToast('Vault API Key is required to fetch memories for summary.', 'error'); return; }
+
+            showLoading('memorySummary');
+            const endpoint = `/memory/${currentUserId}?decryption_key=${encodeURIComponent(currentDecryptionKey)}`;
+            const responseData = await makeVaultApiCall(endpoint, 'GET'); 
+            if (responseData && responseData.memories && responseData.memories.length > 0) {
+                const sortedMemories = responseData.memories.sort((a, b) => new Date(a.timestamp_created) - new Date(b.timestamp_created));
+                let summaryPrompt = "Here is a chronological summary of my recorded memories to provide you with context:\n\n";
+                sortedMemories.forEach(memory => {
+                    const date = new Date(memory.timestamp_created).toLocaleString();
+                    summaryPrompt += `Date: ${date}\nMemory ID: ${memory.memory_id}\n`;
+                    if (memory.metadata && Object.keys(memory.metadata).length > 0) { summaryPrompt += `Metadata: ${JSON.stringify(memory.metadata)}\n`; }
+                    summaryPrompt += `Content:\n${memory.data}\n--------------------------------------------------\n\n`;
+                });
+                llmPromptInput.value = summaryPrompt; showToast('Memory summary prompt generated!', 'info');
+            } else if (responseData && responseData.memories && responseData.memories.length === 0) {
+                llmPromptInput.value = "No memories found to summarize."; showToast('No memories available to generate a summary.', 'info');
+            } else { llmPromptInput.value = "Failed to generate memory summary. Check Vault Operation Results."; }
+        });
+        sendToLlmBtn.addEventListener('click', async () => {
+            const promptText = llmPromptInput.value.trim();
+            const geminiKey = geminiApiKeyInput.value.trim(); 
+            if (!promptText) { showToast('Please enter a prompt for Gemini.', 'error'); return; }
+            const fullGeminiApiUrl = GEMINI_API_URL_TEMPLATE + geminiKey;
+            showLoading('llm'); llmResponseArea.textContent = 'Sending to Gemini...';
+            const payload = { contents: [{ role: "user", parts: [{ text: promptText }] }] };
+            try {
+                const response = await fetch(fullGeminiApiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                const result = await response.json(); hideLoading();
+                if (!response.ok) { const errorDetail = result.error ? result.error.message : JSON.stringify(result); throw new Error(`Gemini API Error: ${response.status} - ${errorDetail}`); }
+                if (result.candidates && result.candidates[0]?.content?.parts?.[0]?.text) {
+                    llmResponseArea.textContent = result.candidates[0].content.parts[0].text; showToast('Received response from Gemini.', 'info');
+                } else if (result.promptFeedback?.blockReason) {
+                    llmResponseArea.textContent = `Prompt blocked: ${result.promptFeedback.blockReason}\nDetails: ${JSON.stringify(result.promptFeedback.safetyRatings, null, 2)}`; showToast('Prompt blocked by Gemini.', 'error');
+                } else { llmResponseArea.textContent = 'No content or unexpected response from Gemini.\n' + JSON.stringify(result, null, 2); showToast('Unexpected response from Gemini.', 'error');}
+            } catch (error) {
+                hideLoading(); console.error('Gemini API Call Error:', error);
+                llmResponseArea.textContent = `Error communicating with Gemini: ${error.message}`; showToast(error.message, 'error');
+            }
+        });
+
+        // Initialize
+        checkLoginState();
+
+    </script>
+</body>
+</html>
