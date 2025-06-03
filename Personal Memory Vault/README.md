@@ -3,13 +3,13 @@
 ## Project Overview
 
 The Personal Memory Vault is a web application designed to provide users with a secure and private way to store, manage, and interact with their personal memories and notes. It features a Python Flask backend for memory storage and integrity verification using Merkle trees, and an HTML/JavaScript frontend for user interaction, profile management (stored locally in the browser), calendar-based note-taking, and integration with Large Language Models (LLMs) like Gemini.
-
+```
 The core principles of this project include:
 🔐 **Security Focused:** While currently using placeholder encryption, the architecture is designed for robust encryption and data integrity.
 🔄 **User-Controlled Data:** Users manage their profiles and API keys locally, and memory data is intended to be user-encrypted.
 🧩 **Modular Features:** Includes distinct modules for profile management, API key settings, calendar notes, memory viewing/addition, and LLM interaction.
 📜 **Auditable (Conceptual):** Merkle trees are used on the backend to ensure the integrity of stored memory sets.
-
+```
 ## Features
 
 * **Secure Login:** Basic user login/registration system (using browser `localStorage` for user credentials in this version).
