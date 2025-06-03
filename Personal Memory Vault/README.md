@@ -47,7 +47,7 @@ The core principles of this project include:
 
 ## Folder Structure
 
-
+```
 personal_memory_vault/
 ├── backend/
 │   ├── main.py             # Flask application (server)
@@ -68,7 +68,7 @@ personal_memory_vault/
 │
 └── README.md               # This file
 
-
+```
 ## Backend Setup
 
 The backend is a Python Flask application.
@@ -175,5 +175,3 @@ The frontend is a single HTML file (`memory_gui.html`) that interacts with the b
 * **Testing:** Comprehensive unit and integration tests for both backend and frontend.
 
 ---
-
-This README provides a starting point. Feel free to expand and refine it as the project evolves!
