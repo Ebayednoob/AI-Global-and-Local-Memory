@@ -1,0 +1,935 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive E2EE Context Sharing Tutorial</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            overscroll-behavior: none;
+        }
+        .step-content {
+            display: none;
+        }
+        .step-content.active {
+            display: block;
+        }
+        .math-box {
+            background-color: #f3f4f6;
+            border-left: 4px solid #4f46e5;
+            padding: 1rem;
+            margin-top: 1.5rem;
+            border-radius: 0.5rem;
+            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+            font-size: 0.9em;
+            overflow-x: auto;
+        }
+        .graph-container {
+            border: 1px solid #e5e7eb;
+            border-radius: 0.75rem;
+            background-color: #f9fafb;
+            min-height: 400px;
+        }
+        .node {
+            cursor: pointer;
+        }
+        .node circle {
+            stroke: #9ca3af;
+            stroke-width: 1.5px;
+        }
+        .node.removed circle {
+            stroke: #ef4444;
+            fill: #fecaca;
+        }
+        .node.removed text {
+            text-decoration: line-through;
+            fill: #991b1b;
+        }
+        .node text {
+            font-size: 10px;
+            pointer-events: none;
+        }
+        .link {
+            stroke: #9ca3af;
+            stroke-width: 1.5px;
+            stroke-dasharray: 5,5;
+        }
+        .arrow {
+            fill: #9ca3af;
+        }
+        .button-primary {
+            transition: all 0.2s ease-in-out;
+        }
+        .button-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+        }
+        .tooltip {
+            position: absolute;
+            text-align: center;
+            padding: 8px;
+            font-size: 12px;
+            background: #111827;
+            color: #fff;
+            border: 0px;
+            border-radius: 8px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+        .crdt-set-container {
+            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+            font-size: 0.8em;
+            padding: 0.5rem;
+            border: 1px dashed #cbd5e1;
+            border-radius: 0.5rem;
+            min-height: 50px;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800 antialiased">
+
+    <div id="app" class="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
+        
+        <header class="text-center mb-8">
+            <h1 class="text-3xl sm:text-4xl font-bold text-gray-900 tracking-tight">End-to-End Encrypted Context Sharing</h1>
+            <p class="mt-2 text-lg text-gray-600">An Interactive Step-by-Step Tutorial</p>
+        </header>
+
+        <div class="bg-white p-6 sm:p-8 rounded-xl shadow-lg">
+            
+            <!-- Progress Bar -->
+            <div class="mb-8">
+                <div class="flex justify-between mb-1">
+                    <span id="step-title" class="text-base font-medium text-indigo-700"></span>
+                    <span id="step-counter" class="text-sm font-medium text-indigo-700"></span>
+                </div>
+                <div class="w-full bg-gray-200 rounded-full h-2.5">
+                    <div id="progress-bar" class="bg-indigo-600 h-2.5 rounded-full transition-all duration-500 ease-out"></div>
+                </div>
+            </div>
+
+            <!-- Main Content Area -->
+            <div id="tutorial-content">
+                <!-- Step content will be injected here by JavaScript -->
+            </div>
+
+            <!-- Navigation -->
+            <div class="mt-8 flex justify-between items-center">
+                <button id="prev-btn" class="button-primary bg-white text-gray-700 font-semibold py-2 px-4 border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50">Previous</button>
+                <button id="next-btn" class="button-primary bg-indigo-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-indigo-700">Next</button>
+            </div>
+        </div>
+        
+        <footer class="text-center mt-8 text-sm text-gray-500">
+            <p>Based on the research paper "End-to-End Encrypted Context Sharing".</p>
+        </footer>
+
+    </div>
+
+    <div id="tooltip" class="tooltip"></div>
+
+    <script>
+        // --- Main Application Logic ---
+        document.addEventListener('DOMContentLoaded', () => {
+            const app = {
+                currentStep: 0,
+                steps: [
+                    {
+                        title: "What is Context?",
+                        render: renderStep1,
+                    },
+                    {
+                        title: "The Need for Encryption",
+                        render: renderStep2,
+                    },
+                    {
+                        title: "The Cryptographic Toolkit",
+                        render: renderStep3,
+                    },
+                    {
+                        title: "Authentication via Digital Signatures",
+                        render: renderStep4,
+                    },
+                    {
+                        title: "Group Management with CRDTs",
+                        render: renderStep5,
+                    },
+                    {
+                        title: "Challenges & The Full Picture",
+                        render: renderStep6,
+                    }
+                ],
+
+                init() {
+                    this.nextBtn = document.getElementById('next-btn');
+                    this.prevBtn = document.getElementById('prev-btn');
+                    this.contentContainer = document.getElementById('tutorial-content');
+                    this.progressBar = document.getElementById('progress-bar');
+                    this.stepTitleEl = document.getElementById('step-title');
+                    this.stepCounterEl = document.getElementById('step-counter');
+
+                    this.nextBtn.addEventListener('click', () => this.next());
+                    this.prevBtn.addEventListener('click', () => this.prev());
+
+                    this.render();
+                },
+
+                next() {
+                    if (this.currentStep < this.steps.length - 1) {
+                        this.currentStep++;
+                        this.render();
+                    }
+                },
+
+                prev() {
+                    if (this.currentStep > 0) {
+                        this.currentStep--;
+                        this.render();
+                    }
+                },
+                
+                render() {
+                    // Clear previous content
+                    this.contentContainer.innerHTML = '';
+                    
+                    // Render current step
+                    const stepData = this.steps[this.currentStep];
+                    this.contentContainer.innerHTML = stepData.render();
+
+                    // Run step-specific JS if it exists
+                    const stepScript = window[`initStep${this.currentStep + 1}`];
+                    if (typeof stepScript === 'function') {
+                        stepScript();
+                    }
+                    
+                    // Update UI elements
+                    this.updateUI();
+                },
+
+                updateUI() {
+                    const stepData = this.steps[this.currentStep];
+                    this.stepTitleEl.textContent = `Step ${this.currentStep + 1}: ${stepData.title}`;
+                    this.stepCounterEl.textContent = `${this.currentStep + 1} / ${this.steps.length}`;
+                    
+                    const progressPercentage = ((this.currentStep) / (this.steps.length - 1)) * 100;
+                    this.progressBar.style.width = `${progressPercentage}%`;
+
+                    this.prevBtn.style.visibility = this.currentStep === 0 ? 'hidden' : 'visible';
+                    this.nextBtn.textContent = this.currentStep === this.steps.length - 1 ? 'Finish' : 'Next';
+                }
+            };
+
+            app.init();
+        });
+
+        // --- Tooltip Logic ---
+        const tooltip = d3.select("#tooltip");
+        const showTooltip = (event, text) => {
+            tooltip.style("opacity", 1)
+                   .html(text)
+                   .style("left", (event.pageX + 15) + "px")
+                   .style("top", (event.pageY - 28) + "px");
+        };
+        const hideTooltip = () => {
+            tooltip.style("opacity", 0);
+        };
+
+
+        // --- Step-by-Step Content & Visualizations ---
+
+        // ========= STEP 1 =========
+        function renderStep1() {
+            return `
+                <div class="grid md:grid-cols-2 gap-8 items-center">
+                    <div>
+                        <h2 class="text-2xl font-bold text-gray-900 mb-4">What is "Context"?</h2>
+                        <p class="text-gray-600 mb-4">
+                            Before we can share context securely, we must define it. In computing, context is any information that can be used to characterize the situation of an entity (a person, place, or object). It's the "who, what, where, when, and why" of an interaction.
+                        </p>
+                        <p class="text-gray-600">
+                            The diagram shows key categories of context. <strong>Hover over the nodes</strong> to see examples. This rich, sensitive data is what context-aware apps use to provide personalized experiences.
+                        </p>
+                        <div class="math-box">
+                            <h3 class="font-semibold text-gray-800 mb-2">Conceptual Model:</h3>
+                            <p>Context(Entity) = {Individuality, Activity, Location, Time, Relations, ...}</p>
+                            <p class="mt-2 text-sm text-gray-500">At this stage, the concept is qualitative. We are defining the data we need to protect.</p>
+                        </div>
+                    </div>
+                    <div id="vis1" class="graph-container w-full h-full"></div>
+                </div>
+            `;
+        }
+        function initStep1() {
+            const container = d3.select("#vis1");
+            if (container.empty()) { console.error("Container #vis1 not found."); return; }
+
+            const data = {
+                nodes: [
+                    { id: 0, name: "User", isCenter: true },
+                    { id: 1, name: "Individuality" },
+                    { id: 2, name: "Activity" },
+                    { id: 3, name: "Location" },
+                    { id: 4, name: "Time" },
+                    { id: 5, name: "Relations" },
+                ],
+                links: [
+                    { source: 0, target: 1 }, { source: 0, target: 2 },
+                    { source: 0, target: 3 }, { source: 0, target: 4 }, { source: 0, target: 5 }
+                ],
+                tooltips: {
+                    "Individuality": "Preferences, health status, mood, device type",
+                    "Activity": "Working, commuting, exercising, reading",
+                    "Location": "GPS coordinates, 'at home', 'in the office'",
+                    "Time": "Time of day, date, duration of an activity",
+                    "Relations": "Social connections, interacting with an IoT device",
+                    "User": "The central entity whose context is being characterized."
+                }
+            };
+
+            const width = container.node().getBoundingClientRect().width;
+            const height = 350;
+            
+            const svg = container.append("svg")
+                .attr("width", width)
+                .attr("height", height);
+
+            const simulation = d3.forceSimulation(data.nodes)
+                .force("link", d3.forceLink(data.links).id(d => d.id).distance(120))
+                .force("charge", d3.forceManyBody().strength(-200))
+                .force("center", d3.forceCenter(width / 2, height / 2));
+
+            const link = svg.append("g")
+                .selectAll("line")
+                .data(data.links)
+                .enter().append("line")
+                .attr("class", "link");
+
+            const node = svg.append("g")
+                .selectAll("g")
+                .data(data.nodes)
+                .enter().append("g")
+                .attr("class", "node")
+                .on("mouseover", (event, d) => showTooltip(event, data.tooltips[d.name]))
+                .on("mouseout", hideTooltip)
+                .call(d3.drag()
+                    .on("start", dragstarted)
+                    .on("drag", dragged)
+                    .on("end", dragended));
+
+            node.append("circle")
+                .attr("r", d => d.isCenter ? 30 : 25)
+                .attr("fill", d => d.isCenter ? "#4f46e5" : "#fff");
+
+            node.append("text")
+                .attr("text-anchor", "middle")
+                .attr("dy", ".3em")
+                .attr("fill", d => d.isCenter ? "#fff" : "#374151")
+                .style("font-size", "12px")
+                .text(d => d.name);
+
+            simulation.on("tick", () => {
+                link
+                    .attr("x1", d => d.source.x)
+                    .attr("y1", d => d.source.y)
+                    .attr("x2", d => d.target.x)
+                    .attr("y2", d => d.target.y);
+                node
+                    .attr("transform", d => `translate(${d.x},${d.y})`);
+            });
+
+            function dragstarted(event) {
+                if (!event.active) simulation.alphaTarget(0.3).restart();
+                event.subject.fx = event.subject.x;
+                event.subject.fy = event.subject.y;
+            }
+            function dragged(event) {
+                event.subject.fx = event.x;
+                event.subject.fy = event.y;
+            }
+            function dragended(event) {
+                if (!event.active) simulation.alphaTarget(0);
+                event.subject.fx = null;
+                event.subject.fy = null;
+            }
+        }
+
+        // ========= STEP 2 =========
+        function renderStep2() {
+            return `
+                <div>
+                    <h2 class="text-2xl font-bold text-gray-900 mb-4">The Need for Encryption</h2>
+                    <p class="text-gray-600 mb-4">
+                       Sharing context is useful, but it's highly sensitive. We need to protect it. Not all encryption is the same. End-to-End Encryption (E2EE) provides the strongest guarantee by ensuring only the sender and recipient can read the data.
+                    </p>
+                    <p class="text-gray-600 mb-4">
+                        The diagram below illustrates the difference. <strong>Click the buttons</strong> to see how data is protected (or exposed) in each model.
+                    </p>
+                    <div class="flex justify-center space-x-2 mb-4">
+                        <button id="btn-tls" class="button-primary bg-blue-500 text-white font-semibold py-2 px-4 rounded-lg">Show TLS</button>
+                        <button id="btn-e2ee" class="button-primary bg-indigo-600 text-white font-semibold py-2 px-4 rounded-lg">Show E2EE</button>
+                        <button id="btn-reset-s2" class="button-primary bg-gray-500 text-white font-semibold py-2 px-4 rounded-lg">Reset</button>
+                    </div>
+                    <div id="vis2" class="graph-container w-full h-full p-4"></div>
+                     <div class="math-box">
+                        <h3 class="font-semibold text-gray-800 mb-2">Mathematical Abstraction:</h3>
+                        <p>Let <strong>M</strong> be the plaintext message (our context).</p>
+                        <p>Let <strong>K</strong> be a secret key.</p>
+                        <p>Encryption: <strong>E(M, K) -> C</strong> (Ciphertext)</p>
+                        <p>Decryption: <strong>D(C, K) -> M</strong> (Original Message)</p>
+                        <p class="mt-2 text-sm text-gray-500">In E2EE, the service provider (Server) <strong>never</strong> possesses the key <strong>K</strong>.</p>
+                    </div>
+                </div>
+            `;
+        }
+        function initStep2() {
+            const container = d3.select("#vis2");
+            if (container.empty()) { console.error("Container #vis2 not found."); return; }
+
+            const width = container.node().getBoundingClientRect().width;
+            const height = 350;
+
+            const svg = container.append("svg")
+                .attr("width", width)
+                .attr("height", height);
+
+            const nodes = {
+                alice: { x: width * 0.1, y: height / 2, label: "Alice (Sender)" },
+                server: { x: width * 0.5, y: height / 2, label: "Server" },
+                bob: { x: width * 0.9, y: height / 2, label: "Bob (Recipient)" }
+            };
+
+            svg.selectAll("g.node")
+                .data(Object.entries(nodes))
+                .enter().append("g")
+                .attr("class", "node")
+                .attr("transform", d => `translate(${d[1].x}, ${d[1].y})`)
+                .each(function(d) {
+                    const g = d3.select(this);
+                    g.append("circle").attr("r", 40).attr("fill", "#fff");
+                    g.append("text").text(d[1].label).attr("dy", "0.3em").attr("text-anchor", "middle");
+                    if (d[0] !== "server") {
+                        g.append("text").text("📱").attr("font-size", "24px").attr("dy", "-0.6em").attr("dx", "-0.5em");
+                    } else {
+                         g.append("text").text("☁️").attr("font-size", "24px").attr("dy", "-0.6em").attr("dx", "-0.5em");
+                    }
+                });
+            
+            svg.append("path")
+                .attr("id", "path-alice-server")
+                .attr("d", `M ${nodes.alice.x + 40} ${nodes.alice.y} H ${nodes.server.x - 40}`)
+                .attr("fill", "none").attr("stroke", "#ccc").attr("stroke-width", 2);
+            svg.append("path")
+                .attr("id", "path-server-bob")
+                .attr("d", `M ${nodes.server.x + 40} ${nodes.server.y} H ${nodes.bob.x - 40}`)
+                .attr("fill", "none").attr("stroke", "#ccc").attr("stroke-width", 2);
+
+            let packet = svg.append("g")
+                .attr("id", "packet")
+                .attr("transform", `translate(${nodes.alice.x + 50}, ${nodes.alice.y})`)
+                .style("opacity", 0);
+
+            packet.append("rect").attr("width", 50).attr("height", 30).attr("rx", 5).attr("ry", 5).attr("fill", "#a78bfa").attr("stroke", "#6d28d9");
+            packet.append("text").attr("id", "packet-lock").attr("x", 25).attr("y", 15).attr("text-anchor", "middle").attr("dy", ".3em").attr("font-size", "20px").text("🔓");
+            packet.append("text").attr("id", "packet-data").attr("x", 25).attr("y", 15).attr("text-anchor", "middle").attr("dy", ".3em").attr("font-size", "12px").text("data").style("opacity", 1);
+
+
+            function animate(tls) {
+                packet.interrupt(); // Stop any previous animation
+                packet.style("opacity", 1).attr("transform", `translate(${nodes.alice.x + 50}, ${nodes.alice.y})`);
+                d3.select("#packet-data").style("opacity", 1);
+                d3.select("#packet-lock").text("🔓");
+                
+                const t = d3.transition().duration(4000).ease(d3.easeLinear);
+
+                packet.transition(t)
+                    .attrTween("transform", function() {
+                        const path = d3.select("#path-alice-server").node();
+                        const l = path.getTotalLength();
+                        return function(t) {
+                            const p = path.getPointAtLength(t * l);
+                            return `translate(${p.x}, ${p.y})`;
+                        };
+                    })
+                    .on("start", () => d3.select("#packet-lock").text(tls ? "🔒" : "🔒"))
+                    .on("end", () => {
+                        d3.select("#packet-data").style("opacity", tls ? 1 : 0);
+                        d3.select("#packet-lock").text(tls ? "🔓" : "🔒");
+                        
+                        packet.transition(t)
+                            .attrTween("transform", function() {
+                                const path = d3.select("#path-server-bob").node();
+                                const l = path.getTotalLength();
+                                return function(t) {
+                                    const p = path.getPointAtLength(t * l);
+                                    return `translate(${p.x}, ${p.y})`;
+                                };
+                            })
+                            .on("start", () => d3.select("#packet-lock").text(tls ? "🔒" : "🔒"))
+                            .on("end", () => {
+                                d3.select("#packet-data").style("opacity", 1);
+                                d3.select("#packet-lock").text("🔓");
+                            });
+                    });
+            }
+            
+            d3.select("#btn-tls").on("click", () => animate(true));
+            d3.select("#btn-e2ee").on("click", () => animate(false));
+            d3.select("#btn-reset-s2").on("click", () => {
+                packet.interrupt();
+                packet.style("opacity", 0);
+            });
+        }
+
+
+        // ========= STEP 3 =========
+        function renderStep3() {
+            return `
+                 <div class="grid md:grid-cols-2 gap-8 items-center">
+                    <div>
+                        <h2 class="text-2xl font-bold text-gray-900 mb-4">The Cryptographic Toolkit</h2>
+                        <p class="text-gray-600 mb-4">
+                            E2EE uses a clever combination of two types of cryptography:
+                            <br>• <strong>Asymmetric (Public/Private Key):</strong> Slow, but great for securely sharing keys. Everyone has a public key (like a mailbox slot) and a private key (the key to the mailbox).
+                            <br>• <strong>Symmetric:</strong> Fast and efficient for encrypting the actual data, but requires both parties to have the same secret key.
+                        </p>
+                        <p class="text-gray-600">
+                           <strong>Click 'Start'</strong> to see how they work together to send context securely from Alice to Bob.
+                        </p>
+                        <button id="start-s3-anim" class="button-primary bg-indigo-600 text-white font-semibold py-2 px-4 rounded-lg mt-2">Start Animation</button>
+                        <div class="math-box">
+                            <h3 class="font-semibold text-gray-800 mb-2">The Hybrid Model:</h3>
+                            <p>1. Alice creates a temporary Symmetric Key: <strong>K<sub>sym</sub></strong></p>
+                            <p>2. Alice encrypts <strong>K<sub>sym</sub></strong> with Bob's Public Key: <strong>C<sub>key</sub> = E(K<sub>sym</sub>, K<sub>pub_bob</sub>)</strong></p>
+                            <p>3. Alice encrypts the Context (<strong>M</strong>) with <strong>K<sub>sym</sub></strong>: <strong>C<sub>msg</sub> = E(M, K<sub>sym</sub>)</strong></p>
+                            <p>4. Bob decrypts <strong>C<sub>key</sub></strong> with his Private Key: <strong>K<sub>sym</sub> = D(C<sub>key</sub>, K<sub>priv_bob</sub>)</strong></p>
+                            <p>5. Bob decrypts <strong>C<sub>msg</sub></strong> with <strong>K<sub>sym</sub></strong>: <strong>M = D(C<sub>msg</sub>, K<sub>sym</sub>)</strong></p>
+                        </div>
+                    </div>
+                    <div id="vis3" class="graph-container w-full h-full p-4 relative"></div>
+                </div>
+            `;
+        }
+
+        function initStep3() {
+            const container = d3.select("#vis3");
+            if (container.empty()) { console.error("Container #vis3 not found."); return; }
+
+            const width = container.node().getBoundingClientRect().width;
+            const height = 350;
+
+            const svg = container.append("svg").attr("width", width).attr("height", height);
+
+            const statusText = svg.append("text")
+                .attr("x", width / 2)
+                .attr("y", 30)
+                .attr("text-anchor", "middle")
+                .attr("font-size", "14px")
+                .attr("fill", "#4b5563")
+                .text("Click 'Start' to begin the key exchange.");
+            
+            // Define positions
+            const positions = {
+                alice_device: { x: width * 0.15, y: height / 2},
+                bob_device: { x: width * 0.85, y: height / 2},
+                alice_pub: { x: width * 0.3, y: height * 0.2 },
+                alice_priv: { x: width * 0.15, y: height * 0.8 },
+                bob_pub: { x: width * 0.7, y: height * 0.2 },
+                bob_priv: { x: width * 0.85, y: height * 0.8 },
+            };
+
+            // Draw Alice and Bob
+            const alice = svg.append("g").attr("transform", `translate(${positions.alice_device.x}, ${positions.alice_device.y})`);
+            alice.append("circle").attr("r", 30).attr("fill", "#fff").attr("stroke", "#4f46e5");
+            alice.append("text").text("Alice").attr("text-anchor", "middle").attr("dy", ".3em");
+
+            const bob = svg.append("g").attr("transform", `translate(${positions.bob_device.x}, ${positions.bob_device.y})`);
+            bob.append("circle").attr("r", 30).attr("fill", "#fff").attr("stroke", "#4f46e5");
+            bob.append("text").text("Bob").attr("text-anchor", "middle").attr("dy", ".3em");
+            
+            // Key elements
+            const alicePrivKey = svg.append("text").text("🔑").attr("x", positions.alice_priv.x).attr("y", positions.alice_priv.y).style("opacity", 0).attr("font-size", "24px").attr("text-anchor", "middle");
+            const alicePubKey = svg.append("text").text("📬").attr("x", positions.alice_pub.x).attr("y", positions.alice_pub.y).style("opacity", 0).attr("font-size", "24px").attr("text-anchor", "middle");
+            const bobPrivKey = svg.append("text").text("🔑").attr("x", positions.bob_priv.x).attr("y", positions.bob_priv.y).style("opacity", 0).attr("font-size", "24px").attr("text-anchor", "middle");
+            const bobPubKey = svg.append("text").text("📬").attr("x", positions.bob_pub.x).attr("y", positions.bob_pub.y).style("opacity", 0).attr("font-size", "24px").attr("text-anchor", "middle");
+
+            async function animate() {
+                d3.select("#start-s3-anim").attr("disabled", true).style("opacity", 0.5);
+                statusText.text("1. Alice and Bob generate Public/Private key pairs.");
+                alicePrivKey.transition().duration(500).style("opacity", 1);
+                alicePubKey.transition().duration(500).style("opacity", 1);
+                bobPrivKey.transition().duration(500).style("opacity", 1);
+                bobPubKey.transition().duration(500).style("opacity", 1);
+                await new Promise(r => setTimeout(r, 2000));
+
+                statusText.text("2. They exchange Public Keys (mailboxes).");
+                const tempAlicePubKey = svg.append("text").text("📬").attr("x", positions.alice_pub.x).attr("y", positions.alice_pub.y).attr("font-size", "24px");
+                const tempBobPubKey = svg.append("text").text("📬").attr("x", positions.bob_pub.x).attr("y", positions.bob_pub.y).attr("font-size", "24px");
+                
+                tempAlicePubKey.transition().duration(1500).attr("x", positions.bob_device.x).attr("y", positions.bob_device.y-40).style("opacity", 0).remove();
+                tempBobPubKey.transition().duration(1500).attr("x", positions.alice_device.x).attr("y", positions.alice_device.y-40).style("opacity", 0).remove();
+                await new Promise(r => setTimeout(r, 2000));
+                
+                statusText.text("3. Alice creates a temporary Symmetric Key for the message.");
+                const symKey = svg.append("text").text("🗝️").attr("x", positions.alice_device.x + 40).attr("y", positions.alice_device.y).attr("font-size", "20px");
+                await new Promise(r => setTimeout(r, 2000));
+
+                statusText.text("4. She encrypts the Symmetric Key with Bob's Public Key...");
+                const encryptedSymKey = svg.append("text").text("📦").attr("x", positions.alice_device.x + 40).attr("y", positions.alice_device.y).attr("font-size", "20px");
+                symKey.remove();
+                await new Promise(r => setTimeout(r, 2000));
+
+                statusText.text("5. ...and encrypts her Context data with the Symmetric key.");
+                const encryptedMsg = svg.append("text").text("✉️+🔒").attr("x", positions.alice_device.x + 40).attr("y", positions.alice_device.y + 30).attr("font-size", "20px");
+                await new Promise(r => setTimeout(r, 2000));
+
+                statusText.text("6. She sends both to Bob.");
+                encryptedSymKey.transition().duration(1500).attr("x", positions.bob_device.x - 40);
+                encryptedMsg.transition().duration(1500).attr("x", positions.bob_device.x - 40);
+                await new Promise(r => setTimeout(r, 2000));
+
+                statusText.text("7. Bob uses his Private Key to decrypt the Symmetric Key.");
+                encryptedSymKey.remove();
+                const decryptedSymKey = svg.append("text").text("🗝️").attr("x", positions.bob_device.x - 40).attr("y", positions.bob_device.y).attr("font-size", "20px");
+                bobPrivKey.transition().duration(500).attr("transform", "scale(1.5)").transition().duration(500).attr("transform", "scale(1)");
+                await new Promise(r => setTimeout(r, 2000));
+
+                statusText.text("8. He uses the Symmetric Key to decrypt the Context data. Secure!");
+                encryptedMsg.text("✉️").attr("font-size", "20px");
+                await new Promise(r => setTimeout(r, 2000));
+
+                statusText.text("Process complete! Resetting...");
+                await new Promise(r => setTimeout(r, 2000));
+                
+                // Reset
+                svg.selectAll("text").filter(function() { return !d3.select(this).classed('persistent'); }).remove();
+                d3.select("#start-s3-anim").attr("disabled", null).style("opacity", 1);
+                statusText.text("Click 'Start' to begin the key exchange.");
+            }
+            d3.select("#start-s3-anim").on("click", animate);
+        }
+
+        // ========= STEP 4 =========
+        function renderStep4() {
+             return `
+                 <div class="grid md:grid-cols-2 gap-8 items-center">
+                    <div>
+                        <h2 class="text-2xl font-bold text-gray-900 mb-4">Authentication via Digital Signatures</h2>
+                        <p class="text-gray-600 mb-4">
+                            Encryption ensures confidentiality, but how does Bob know the message is truly from Alice and hasn't been altered? Through a <strong>digital signature</strong>.
+                        </p>
+                        <p class="text-gray-600">
+                           Alice uses her <strong>private key</strong> to "sign" the context. Anyone with her <strong>public key</strong> can verify the signature, but only Alice could have created it. This provides authentication and integrity.
+                           <br><strong>Click 'Sign & Verify'</strong> to see it in action.
+                        </p>
+                        <button id="start-s4-anim" class="button-primary bg-indigo-600 text-white font-semibold py-2 px-4 rounded-lg mt-2">Sign & Verify</button>
+                        <div class="math-box">
+                            <h3 class="font-semibold text-gray-800 mb-2">The Math of Signatures:</h3>
+                            <p>1. Create a hash (a unique fingerprint) of the message: <strong>H(M)</strong></p>
+                            <p>2. Sign the hash with Alice's Private Key: <strong>Sig = Sign(H(M), K<sub>priv_alice</sub>)</strong></p>
+                            <p>3. Bob receives M and Sig. He computes <strong>H(M)</strong> himself.</p>
+                            <p>4. Bob uses Alice's Public Key to verify: <strong>Verify(H(M), Sig, K<sub>pub_alice</sub>)</strong></p>
+                            <p class="mt-2 text-sm text-gray-500">If the result is TRUE, the message is authentic.</p>
+                        </div>
+                    </div>
+                    <div id="vis4" class="graph-container w-full h-full p-4 relative"></div>
+                </div>
+            `;
+        }
+        function initStep4() {
+            const container = d3.select("#vis4");
+            if (container.empty()) { console.error("Container #vis4 not found."); return; }
+
+            const width = container.node().getBoundingClientRect().width;
+            const height = 350;
+            const svg = container.append("svg").attr("width", width).attr("height", height);
+
+            const statusText = svg.append("text").attr("x", width/2).attr("y", 20).attr("text-anchor", "middle").text("Click 'Sign & Verify' to begin.");
+            
+            const alice_x = width * 0.25;
+            const bob_x = width * 0.75;
+            const y_pos = height / 2;
+
+            svg.append("text").text("Alice").attr("x", alice_x).attr("y", y_pos - 80).attr("text-anchor", "middle").attr("font-weight", "bold");
+            svg.append("text").text("Bob").attr("x", bob_x).attr("y", y_pos - 80).attr("text-anchor", "middle").attr("font-weight", "bold");
+
+            async function animate() {
+                d3.select("#start-s4-anim").attr("disabled", true).style("opacity", 0.5);
+                
+                // Cleanup previous runs
+                svg.selectAll(".dynamic").remove();
+
+                statusText.text("1. Alice has her context data (Message M).");
+                const msg_alice = svg.append("text").attr("class", "dynamic").text("✉️ (M)").attr("x", alice_x).attr("y", y_pos - 40).attr("font-size", "24px").attr("text-anchor", "middle");
+                await new Promise(r => setTimeout(r, 1500));
+                
+                statusText.text("2. She creates a unique hash (fingerprint) of M.");
+                const hash_alice = svg.append("text").attr("class", "dynamic").text("# H(M)").attr("x", alice_x).attr("y", y_pos).attr("font-size", "18px").attr("text-anchor", "middle");
+                await new Promise(r => setTimeout(r, 1500));
+
+                statusText.text("3. She signs the hash with her PRIVATE key.");
+                const privKey_alice = svg.append("text").attr("class", "dynamic").text("🔑 (Private)").attr("x", alice_x).attr("y", y_pos + 80).attr("font-size", "24px").attr("text-anchor", "middle");
+                const signature = svg.append("text").attr("class", "dynamic").text("📜 (Sig)").attr("x", alice_x).attr("y", y_pos + 40).attr("font-size", "24px").attr("text-anchor", "middle");
+                privKey_alice.transition().duration(500).attr("y", y_pos + 10).transition().duration(500).attr("y", y_pos + 80);
+                await new Promise(r => setTimeout(r, 1500));
+
+                statusText.text("4. She sends M and the Signature to Bob.");
+                msg_alice.transition().duration(1500).attr("x", bob_x);
+                signature.transition().duration(1500).attr("x", bob_x);
+                await new Promise(r => setTimeout(r, 2000));
+
+                statusText.text("5. Bob also creates a hash of the received message M.");
+                const hash_bob = svg.append("text").attr("class", "dynamic").text("# H(M)").attr("x", bob_x).attr("y", y_pos).attr("font-size", "18px").attr("text-anchor", "middle");
+                await new Promise(r => setTimeout(r, 1500));
+
+                statusText.text("6. Bob uses Alice's PUBLIC key to verify the signature.");
+                const pubKey_alice = svg.append("text").attr("class", "dynamic").text("📬 (Public)").attr("x", bob_x).attr("y", y_pos + 80).attr("font-size", "24px").attr("text-anchor", "middle");
+                pubKey_alice.transition().duration(500).attr("y", y_pos + 10).transition().duration(500).attr("y", y_pos + 80);
+                await new Promise(r => setTimeout(r, 1500));
+
+                statusText.text("7. The hashes match! The message is authentic. ✅");
+                svg.append("path").attr("class", "dynamic")
+                    .attr("d", `M ${bob_x-20} ${y_pos+5} L ${bob_x-10} ${y_pos+15} L ${bob_x+20} ${y_pos-15}`)
+                    .attr("stroke", "green").attr("stroke-width", 4).attr("fill", "none");
+                
+                await new Promise(r => setTimeout(r, 3000));
+                statusText.text("Click 'Sign & Verify' to begin.");
+                svg.selectAll(".dynamic").remove();
+                d3.select("#start-s4-anim").attr("disabled", null).style("opacity", 1);
+            }
+            d3.select("#start-s4-anim").on("click", animate);
+        }
+
+        // ========= STEP 5 =========
+        // FIX: Reworked the layout to be a single column.
+        function renderStep5() {
+            return `
+                <div class="space-y-6">
+                    <div>
+                        <h2 class="text-2xl font-bold text-gray-900 mb-4">Group Management with CRDTs</h2>
+                        <p class="text-gray-600 mb-4">
+                            In a distributed system, how does everyone agree on who is in the group? We use a <strong>Conflict-free Replicated Data Type (CRDT)</strong>. A CRDT ensures that all users eventually converge to the same group state, even if messages arrive out of order.
+                        </p>
+                        <p class="text-gray-600">
+                           Here, we use a <strong>2P-Set</strong> (Two-Phase Set) CRDT, which has an "add" set and a "remove" set. A user is in the group if they are in the add set but NOT in the remove set.
+                           <br><strong>Use the buttons</strong> to see how CRDT operations trigger rekeying.
+                        </p>
+                    </div>
+
+                    <div class="flex flex-wrap gap-2 justify-center">
+                         <button id="add-user-btn" class="button-primary bg-green-500 text-white font-semibold py-2 px-4 rounded-lg">add('David')</button>
+                         <button id="remove-user-btn" class="button-primary bg-red-500 text-white font-semibold py-2 px-4 rounded-lg">remove('Alice')</button>
+                         <button id="reset-s5-btn" class="button-primary bg-gray-500 text-white font-semibold py-2 px-4 rounded-lg">Reset State</button>
+                    </div>
+
+                    <div class="math-box">
+                        <h3 class="font-semibold text-gray-800 mb-2">CRDT Rekeying Logic (2P-Set):</h3>
+                        <p>Let AddSet = {A, B, C}, RemoveSet = {}</p>
+                        <p class="text-indigo-600 font-bold">Members = AddSet - RemoveSet</p>
+                        <p><strong>add('D'):</strong> AddSet becomes {A, B, C, D}. State changed. <strong class="text-green-600">Trigger Rekey!</strong></p>
+                        <p><strong>remove('A'):</strong> RemoveSet becomes {A}. State changed. <strong class="text-red-600">Trigger Rekey!</strong></p>
+                        <p class="mt-2 text-sm text-gray-500">Rekeying is a deterministic function of the CRDT state change.</p>
+                    </div>
+
+                    <div id="vis5" class="graph-container w-full h-full p-2 relative flex items-center justify-center"></div>
+                    
+                    <div>
+                        <h3 class="font-semibold text-center mb-2">CRDT State</h3>
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <p class="text-sm font-medium text-green-700">Additions (A)</p>
+                                <div id="add-set" class="crdt-set-container bg-green-50 text-green-800"></div>
+                            </div>
+                            <div>
+                                <p class="text-sm font-medium text-red-700">Removals (R) <span class="text-gray-400">(Tombstones)</span></p>
+                                <div id="remove-set" class="crdt-set-container bg-red-50 text-red-800"></div>
+                            </div>
+                        </div>
+                     </div>
+                </div>
+            `;
+        }
+
+        function initStep5() {
+            const container = d3.select("#vis5");
+            if (container.empty()) { console.error("Container #vis5 not found."); return; }
+
+            const width = container.node().getBoundingClientRect().width;
+            const height = 350;
+            const svg = container.append("svg").attr("width", width).attr("height", height);
+
+            let statusText = svg.append("text").attr("x", width/2).attr("y", 20).attr("text-anchor", "middle").style('font-size', '12px');
+
+            let allUsers = [
+                { id: "Alice", name: "Alice" }, { id: "Bob", name: "Bob" },
+                { id: "Carol", name: "Carol" }, { id: "David", name: "David" }
+            ];
+
+            let addSet = new Set();
+            let removeSet = new Set();
+            
+            function updateDOMSets() {
+                 d3.select("#add-set").text(`{${[...addSet].join(', ')}}`);
+                 d3.select("#remove-set").text(`{${[...removeSet].join(', ')}}`);
+            }
+
+            function update() {
+                updateDOMSets();
+
+                svg.selectAll(".node, .key-vis").remove();
+
+                const activeNodes = allUsers.filter(u => addSet.has(u.id) && !removeSet.has(u.id));
+                const removedNodes = allUsers.filter(u => addSet.has(u.id) && removeSet.has(u.id));
+
+                const radius = Math.min(width, height) / 4;
+                const angleStep = activeNodes.length > 0 ? (2 * Math.PI) / activeNodes.length : 0;
+
+                const activeNodeElements = svg.append("g").selectAll("g")
+                    .data(activeNodes, d => d.id)
+                    .enter().append("g")
+                    .attr("class", "node")
+                    .attr("transform", (d, i) => {
+                        const angle = angleStep * i - (Math.PI / 2);
+                        const x = width / 2 + radius * Math.cos(angle);
+                        const y = height / 2 + radius * Math.sin(angle);
+                        return `translate(${x}, ${y})`;
+                    });
+
+                activeNodeElements.append("circle").attr("r", 20).attr("fill", "#fff");
+                activeNodeElements.append("text").text(d => d.name).attr("text-anchor", "middle").attr("dy", ".3em");
+                
+                const removedNodeElements = svg.append("g").selectAll("g")
+                    .data(removedNodes, d => d.id)
+                    .enter().append("g")
+                    .attr("class", "node removed")
+                    .attr("transform", (d, i) => {
+                        const x = (width / (removedNodes.length + 1)) * (i + 1);
+                        const y = height - 40;
+                        return `translate(${x}, ${y})`;
+                    });
+
+                removedNodeElements.append("circle").attr("r", 20);
+                removedNodeElements.append("text").text(d => d.name).attr("text-anchor", "middle").attr("dy", ".3em");
+            }
+
+            function showKey(keyId, color) {
+                svg.selectAll(".key-vis").remove();
+                
+                const keyGroup = svg.append("g").attr("class", "key-vis");
+
+                keyGroup.append("text").text("🗝️")
+                    .attr("x", width/2).attr("y", height/2)
+                    .attr("font-size", "40px").attr("text-anchor", "middle")
+                    .style("opacity",0).attr("fill", color)
+                    .transition().duration(500).style("opacity", 1);
+                
+                keyGroup.append("text").text(keyId)
+                    .attr("x", width/2).attr("y", height/2 + 40)
+                    .attr("text-anchor", "middle").attr("font-weight", "bold")
+                    .style("opacity",0).attr("fill", color)
+                    .transition().duration(500).style("opacity", 1);
+            }
+            
+            function addUser() {
+                if (addSet.has("David")) return;
+                statusText.text("CRDT op: add('David'). State changed. Triggering rekey...");
+                addSet.add("David");
+                update();
+                showKey("K2", "#16a34a");
+            }
+            
+            function removeUser() {
+                if (removeSet.has("Alice") || !addSet.has("Alice")) return;
+                statusText.text("CRDT op: remove('Alice'). State changed. Triggering rekey...");
+                removeSet.add("Alice");
+                update();
+                showKey("K3", "#dc2626");
+            }
+
+            function reset() {
+                statusText.text("Initial state. Key K1 is shared among members.");
+                addSet = new Set(["Alice", "Bob", "Carol"]);
+                removeSet = new Set();
+                update();
+                showKey("K1", "#4f46e5");
+            }
+
+            d3.select("#add-user-btn").on("click", addUser);
+            d3.select("#remove-user-btn").on("click", removeUser);
+            d3.select("#reset-s5-btn").on("click", reset);
+            
+            reset();
+        }
+
+        // ========= STEP 6 =========
+        function renderStep6() {
+            return `
+                <div class="grid md:grid-cols-2 gap-8 items-center">
+                    <div>
+                        <h2 class="text-2xl font-bold text-gray-900 mb-4">Challenges & The Full Picture</h2>
+                        <p class="text-gray-600 mb-4">
+                            E2EE is powerful, but not a silver bullet. Two major challenges remain:
+                        </p>
+                        <ul class="list-disc list-inside text-gray-600 space-y-2">
+                           <li><strong>Metadata Leakage:</strong> While the context *content* is secret, information *about* the context (who shared with whom, when, how often) can still be observed by the server. This can reveal sensitive patterns.</li>
+                           <li><strong>Endpoint Security:</strong> E2EE protects data in transit and on the server. If a recipient's device is compromised with malware, the attacker can access the context after it's decrypted. The security of the "ends" is paramount.</li>
+                        </ul>
+                        <p class="text-gray-600 mt-4">
+                           This tutorial has shown how E2EE provides a strong foundation for secure context sharing, balancing utility with privacy by giving users cryptographic control over their data.
+                        </p>
+                    </div>
+                    <div id="vis6" class="graph-container w-full h-full p-4 relative">
+                        <div class="text-center">
+                            <h3 class="font-bold mb-4">Visualizing the Challenges</h3>
+                            <div class="flex flex-col space-y-8">
+                                <!-- Metadata -->
+                                <div class="text-left">
+                                    <h4 class="font-semibold">Metadata Leakage</h4>
+                                    <p class="text-sm text-gray-500 mb-2">Server sees patterns, not content.</p>
+                                    <div class="flex items-center justify-between">
+                                        <span class="text-2xl">📱</span>
+                                        <div class="flex flex-col items-center">
+                                            <span class="text-xs">who, when, size</span>
+                                            <span class="text-3xl text-gray-400">→ � →</span>
+                                        </div>
+                                        <span class="text-2xl">☁️</span>
+                                         <div class="flex flex-col items-center">
+                                            <span class="text-xs">who, when, size</span>
+                                            <span class="text-3xl text-gray-400">→ 📦 →</span>
+                                        </div>
+                                        <span class="text-2xl">📱</span>
+                                    </div>
+                                </div>
+                                <!-- Endpoint -->
+                                <div class="text-left">
+                                    <h4 class="font-semibold">Endpoint Compromise</h4>
+                                    <p class="text-sm text-gray-500 mb-2">Malware on a device bypasses E2EE.</p>
+                                    <div class="flex items-center justify-center space-x-4">
+                                        <span class="text-2xl">... → 📦</span>
+                                        <div class="relative">
+                                            <span class="text-4xl">📱</span>
+                                            <span class="absolute -top-2 -right-2 text-2xl">🦠</span>
+                                        </div>
+                                        <span class="text-gray-400 text-3xl">→</span>
+                                        <span class="text-2xl">🔓 (data exposed)</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+        function initStep6() { /* No special JS needed for this static step */ }
+
+    </script>
+
+</body>
+</html>
+�
