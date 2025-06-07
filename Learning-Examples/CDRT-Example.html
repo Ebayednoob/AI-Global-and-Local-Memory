@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive CRDT Workbook: G-Counter</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .card {
+            background-color: white;
+            border-radius: 0.75rem;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            padding: 1.5rem;
+            transition: all 0.2s ease-in-out;
+        }
+        .code-block {
+            background-color: #1f2937;
+            color: #d1d5db;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            overflow-x: auto;
+            font-family: 'Courier New', Courier, monospace;
+        }
+        .btn {
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            font-weight: 500;
+            color: white;
+            transition: background-color 0.2s;
+        }
+        .btn-primary {
+            background-color: #4f46e5;
+        }
+        .btn-primary:hover {
+            background-color: #4338ca;
+        }
+         .btn-secondary {
+            background-color: #16a34a;
+        }
+        .btn-secondary:hover {
+            background-color: #15803d;
+        }
+        .latex {
+            font-family: "Latin Modern Math", "Cambria Math", serif;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800">
+
+    <div class="container mx-auto p-4 md:p-8 max-w-5xl">
+        <header class="text-center mb-10">
+            <h1 class="text-4xl md:text-5xl font-bold text-gray-900">Interactive CRDT Workbook</h1>
+            <p class="mt-4 text-lg text-gray-600">Experiment with a G-Counter and see eventual consistency in action.</p>
+        </header>
+
+        <!-- Introduction Section -->
+        <div class="card mb-8">
+            <h2 class="text-2xl font-bold mb-4">The Algebraic Foundation of CRDTs</h2>
+            <p class="mb-4">Conflict-free Replicated Data Types (CRDTs) are special data structures designed for distributed systems. They can be updated independently on different computers (replicas) without needing a central coordinator.</p>
+            <p>The "magic" that makes this possible lies in the `merge` operation, which must have these three mathematical properties that form a <strong class="font-semibold">semilattice</strong>:</p>
+            <ul class="list-disc list-inside mt-4 space-y-2">
+                <li><strong class="font-semibold">Associative:</strong> <code>(a merge b) merge c = a merge (b merge c)</code>. The grouping of merges doesn't affect the outcome.</li>
+                <li><strong class="font-semibold">Commutative:</strong> <code>a merge b = b merge a</code>. The order of merges doesn't matter.</li>
+                <li><strong class="font-semibold">Idempotent:</strong> <code>a merge a = a</code>. Merging identical states has no effect.</li>
+            </ul>
+            <p class="mt-4">These properties guarantee that no matter how or when updates are shared, all replicas will eventually reach the same state.</p>
+        </div>
+
+        <!-- Section: Visualizing Convergence -->
+        <div class="card mb-8">
+            <h2 class="text-2xl font-bold mb-4">Visualizing Eventual Convergence</h2>
+            <p class="mb-4">
+                How do we know for sure that all replicas will end up in the same state? This is guaranteed by <strong class="font-semibold">deterministic merging</strong>. Every merge operation follows the same mathematical rules, so the outcome is always predictable and the same, regardless of the order of operations.
+            </p>
+            <p class="mb-6">
+                Let's visualize this. Imagine two replicas, A and B. They both start with the same initial state. Then, they both get updated independently and concurrently.
+            </p>
+            <div class="flex justify-center p-4">
+                <svg width="100%" height="300" viewBox="0 0 500 300" class="font-sans">
+                    <defs>
+                        <marker id="arrow" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                            <path d="M 0 0 L 10 5 L 0 10 z" fill="#6b7280" />
+                        </marker>
+                    </defs>
+
+                    <!-- Lines/Arrows -->
+                    <line x1="250" y1="55" x2="105" y2="120" stroke="#9ca3af" stroke-width="2" marker-end="url(#arrow)" />
+                    <line x1="250" y1="55" x2="395" y2="120" stroke="#9ca3af" stroke-width="2" marker-end="url(#arrow)" />
+                    <line x1="100" y1="180" x2="245" y2="235" stroke="#9ca3af" stroke-width="2" marker-end="url(#arrow)" />
+                    <line x1="400" y1="180" x2="255" y2="235" stroke="#9ca3af" stroke-width="2" marker-end="url(#arrow)" />
+
+                    <!-- Nodes (Circles) -->
+                    <circle cx="250" cy="40" r="35" fill="#e5e7eb" stroke="#9ca3af" stroke-width="1"/>
+                    <circle cx="100" cy="150" r="45" fill="#dbeafe" stroke="#9ca3af" stroke-width="1"/>
+                    <circle cx="400" cy="150" r="45" fill="#dcfce7" stroke="#9ca3af" stroke-width="1"/>
+                    <circle cx="250" cy="250" r="55" fill="#fbcfe8" stroke="#9ca3af" stroke-width="1"/>
+
+                    <!-- Node Text -->
+                    <text x="250" y="45" text-anchor="middle" font-size="14" fill="#1f2937" font-weight="500">Initial State</text>
+                    <text x="100" y="145" text-anchor="middle" font-size="14" fill="#1e40af" font-weight="500">State A</text>
+                    <text x="100" y="165" text-anchor="middle" font-size="12" fill="#1e40af">(Replica A)</text>
+                    <text x="400" y="145" text-anchor="middle" font-size="14" fill="#166534" font-weight="500">State B</text>
+                    <text x="400" y="165" text-anchor="middle" font-size="12" fill="#166534">(Replica B)</text>
+                    <text x="250" y="245" text-anchor="middle" font-size="14" fill="#831843" font-weight="500"><tspan class="latex">State A ⊔ State B</tspan></text>
+                    <text x="250" y="265" text-anchor="middle" font-size="12" fill="#831843">(Converged State)</text>
+
+                    <!-- Arrow Labels -->
+                    <text x="150" y="100" fill="#4b5563" font-size="12">Update A</text>
+                    <text x="320" y="100" fill="#4b5563" font-size="12">Update B</text>
+                    <text x="135" y="225" fill="#4b5563" font-size="12">Merge B into A</text>
+                    <text x="305" y="225" fill="#4b5563" font-size="12">Merge A into B</text>
+                </svg>
+            </div>
+            <p class="mt-4">
+                The graph shows that no matter which path you take, you arrive at the same final, merged state.
+            </p>
+            <ul class="list-disc list-inside mt-4 space-y-2">
+                <li>If Replica A merges Replica B's state, it reaches the final state: <code><span class="latex">State A ⊔ State B</span></code>.</li>
+                <li>If Replica B merges Replica A's state, it also reaches the final state: <code><span class="latex">State B ⊔ State A</span></code>.</li>
+            </ul>
+            <p class="mt-4">
+                Because the merge operation (represented by <span class="latex">⊔</span>, the mathematical "join" symbol) is <strong class="font-semibold">commutative</strong> (meaning <code class="latex">A ⊔ B = B ⊔ A</code>), both paths are guaranteed to lead to the exact same result. This is the mathematical foundation of eventual consistency in CRDTs.
+            </p>
+        </div>
+        
+        <!-- NEW Section: Join Semilattices -->
+        <div class="card mb-8">
+            <h2 class="text-2xl font-bold mb-4">The Math Behind the Magic: Join Semilattices</h2>
+            <p class="mb-4">The structure that guarantees convergence is a <strong class="font-semibold">join semilattice</strong>. It consists of a set of all possible states of our data type and a special binary operation called a <strong class="font-semibold">join</strong> or <strong class="font-semibold">Least Upper Bound (LUB)</strong>, symbolized as <span class="latex">⊔</span>. This is our `merge` function.</p>
+
+            <h3 class="text-xl font-semibold mt-6 mb-2">1. Partial Order</h3>
+            <p class="mb-4">First, the set of states must have a <strong class="font-semibold">partial order</strong>, typically denoted by <span class="latex">≤</span>. This defines the relationship between states. For a G-Counter, `stateX ≤ stateY` if `stateY` contains all the updates of `stateX` (and possibly more). Not all states are comparable; for example, two states that diverged from a common ancestor are not ordered with respect to each other.</p>
+            
+            <h3 class="text-xl font-semibold mt-6 mb-2">2. Least Upper Bound (LUB)</h3>
+            <p class="mb-4">For any two states in the set (e.g., State X and State Y), their LUB is another state, Z, such that:</p>
+            <ul class="list-disc list-inside space-y-2">
+                <li>Z is an <strong class="font-semibold">upper bound</strong> of X and Y (meaning <span class="latex">X ≤ Z</span> and <span class="latex">Y ≤ Z</span>). It preserves all information from both.</li>
+                <li>Z is the <strong class="font-semibold">least</strong> of all possible upper bounds. There is no smaller state that is also an upper bound for both X and Y.</li>
+            </ul>
+            <p class="mt-4">The `merge` function in a CRDT is designed to compute this LUB. For a G-Counter, taking the `max()` of each replica's count finds the LUB perfectly.</p>
+            
+            <h3 class="text-xl font-semibold mt-6 mb-2">Graphical Example: A Hasse Diagram</h3>
+            <p class="mb-4">This diagram shows a simple join semilattice. Arrows indicate the partial order (e.g., <span class="latex">A ≤ C</span>). If we want to find the LUB of states C and D, we look for the "lowest" state that is an ancestor to both. In this case, it's state F. Thus, <span class="latex">C ⊔ D = F</span>.</p>
+            
+            <div class="flex justify-center p-4">
+                 <svg width="100%" height="320" viewBox="0 0 400 320" class="font-sans">
+                     <!-- Lines -->
+                    <line x1="200" y1="290" x2="100" y2="215" stroke="#9ca3af" stroke-width="2"/>
+                    <line x1="200" y1="290" x2="300" y2="215" stroke="#9ca3af" stroke-width="2"/>
+                    <line x1="100" y1="195" x2="100" y2="125" stroke="#9ca3af" stroke-width="2"/>
+                    <line x1="100" y1="105" x2="200" y2="45" stroke="#9ca3af" stroke-width="2"/>
+                    <line x1="300" y1="195" x2="300" y2="125" stroke="#9ca3af" stroke-width="2"/>
+                    <line x1="300" y1="105" x2="200" y2="45" stroke="#9ca3af" stroke-width="2"/>
+                    <line x1="100" y1="195" x2="300" y2="125" stroke="#d1d5db" stroke-width="2" stroke-dasharray="4"/>
+
+                    <!-- Nodes -->
+                    <circle cx="200" cy="30" r="25" fill="#f3e8ff" stroke="#9333ea" stroke-width="2"/>
+                    <circle cx="100" cy="110" r="25" fill="#e0e7ff" stroke="#4f46e5" stroke-width="2"/>
+                    <circle cx="300" cy="110" r="25" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
+                    <circle cx="100" cy="210" r="25" fill="#e0e7ff" stroke="#4f46e5" stroke-width="2"/>
+                    <circle cx="300" cy="210" r="25" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
+                    <circle cx="200" cy="300" r="25" fill="#f1f5f9" stroke="#64748b" stroke-width="2"/>
+
+                    <!-- LUB Highlight -->
+                     <circle cx="200" cy="30" r="30" fill="none" stroke="#f43f5e" stroke-width="2.5" stroke-dasharray="5 5"/>
+                    <line x1="123" y1="200" x2="185" y2="50" stroke="#f43f5e" stroke-width="1.5" stroke-dasharray="3 3"/>
+                    <line x1="277" y1="200" x2="215" y2="50" stroke="#f43f5e" stroke-width="1.5" stroke-dasharray="3 3"/>
+
+                    <!-- Node Text -->
+                    <text x="200" y="35" text-anchor="middle" font-size="14" font-weight="600" fill="#581c87">F</text>
+                    <text x="100" y="115" text-anchor="middle" font-size="14" font-weight="600" fill="#312e81">C</text>
+                    <text x="300" y="115" text-anchor="middle" font-size="14" font-weight="600" fill="#064e3b">D</text>
+                    <text x="100" y="215" text-anchor="middle" font-size="14" font-weight="600" fill="#312e81">A</text>
+                    <text x="300" y="215" text-anchor="middle" font-size="14" font-weight="600" fill="#064e3b">B</text>
+                    <text x="200" y="305" text-anchor="middle" font-size="14" font-weight="600" fill="#334155">⊥</text>
+
+                    <!-- LUB Text -->
+                    <text x="150" y="140" fill="#f43f5e" font-size="12" font-weight="bold"><tspan class="latex">C ⊔ B = F</tspan></text>
+                 </svg>
+            </div>
+        </div>
+
+        <!-- G-Counter Code Section -->
+        <div class="card mb-8">
+            <h2 class="text-2xl font-bold mb-4">The G-Counter (Grow-Only Counter)</h2>
+            <p class="mb-4">Our example CRDT is a G-Counter. Its state is a simple map of replica IDs to their individual counts. The total value is the sum of all counts. To merge, we just take the maximum value for each replica's count, ensuring no increments are ever lost.</p>
+            <p class="mb-2">Here is the logic implemented in JavaScript:</p>
+            <div class="code-block">
+<pre><code>
+class GCounter {
+    constructor(replicaId) {
+        this.replicaId = replicaId;
+        this.payload = { [this.replicaId]: 0 };
+    }
+
+    increment() {
+        this.payload[this.replicaId]++;
+    }
+
+    value() {
+        return Object.values(this.payload).reduce((sum, val) => sum + val, 0);
+    }
+
+    merge(otherCounter) {
+        const allReplicas = new Set([
+            ...Object.keys(this.payload), 
+            ...Object.keys(otherCounter.payload)
+        ]);
+        
+        const mergedPayload = {};
+        for (const replica of allReplicas) {
+            const val1 = this.payload[replica] || 0;
+            const val2 = otherCounter.payload[replica] || 0;
+            mergedPayload[replica] = Math.max(val1, val2);
+        }
+        this.payload = mergedPayload;
+    }
+}
+</code></pre>
+            </div>
+        </div>
+
+        <!-- Interactive Simulation -->
+        <div class="card mb-8">
+            <h2 class="text-2xl font-bold mb-4 text-center">Live Simulation</h2>
+            <p class="text-center mb-6 text-gray-600">Follow the steps below to see CRDTs in action!</p>
+
+            <!-- Replicas Display -->
+            <div class="grid md:grid-cols-3 gap-6 text-center">
+                <!-- Replica A -->
+                <div id="replica-A" class="bg-gray-100 p-4 rounded-lg border">
+                    <h3 class="text-xl font-semibold mb-3">Replica A</h3>
+                    <button onclick="counters.A.increment(); updateUI();" class="btn btn-primary w-full mb-3">Increment A</button>
+                    <div class="text-left">
+                        <p class="font-medium">Payload:</p>
+                        <pre id="payload-A" class="bg-white p-2 rounded text-sm min-h-[4em]"></pre>
+                        <p class="font-medium mt-2">Total Value:</p>
+                        <p id="value-A" class="font-bold text-2xl"></p>
+                    </div>
+                </div>
+                <!-- Replica B -->
+                <div id="replica-B" class="bg-gray-100 p-4 rounded-lg border">
+                    <h3 class="text-xl font-semibold mb-3">Replica B</h3>
+                    <button onclick="counters.B.increment(); updateUI();" class="btn btn-primary w-full mb-3">Increment B</button>
+                    <div class="text-left">
+                        <p class="font-medium">Payload:</p>
+                        <pre id="payload-B" class="bg-white p-2 rounded text-sm min-h-[4em]"></pre>
+                        <p class="font-medium mt-2">Total Value:</p>
+                        <p id="value-B" class="font-bold text-2xl"></p>
+                    </div>
+                </div>
+                <!-- Replica C -->
+                <div id="replica-C" class="bg-gray-100 p-4 rounded-lg border">
+                    <h3 class="text-xl font-semibold mb-3">Replica C</h3>
+                    <button onclick="counters.C.increment(); updateUI();" class="btn btn-primary w-full mb-3">Increment C</button>
+                    <div class="text-left">
+                        <p class="font-medium">Payload:</p>
+                        <pre id="payload-C" class="bg-white p-2 rounded text-sm min-h-[4em]"></pre>
+                        <p class="font-medium mt-2">Total Value:</p>
+                        <p id="value-C" class="font-bold text-2xl"></p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Merge Controls -->
+            <div class="mt-8">
+                 <h3 class="text-lg font-semibold mb-3 text-center">Merge Operations</h3>
+                 <div class="grid grid-cols-2 md:grid-cols-3 gap-4 max-w-2xl mx-auto">
+                    <button onclick="counters.A.merge(counters.B); updateUI();" class="btn btn-secondary">Merge B -> A</button>
+                    <button onclick="counters.A.merge(counters.C); updateUI();" class="btn btn-secondary">Merge C -> A</button>
+                    <button onclick="counters.B.merge(counters.A); updateUI();" class="btn btn-secondary">Merge A -> B</button>
+                    <button onclick="counters.B.merge(counters.C); updateUI();" class="btn btn-secondary">Merge C -> B</button>
+                    <button onclick="counters.C.merge(counters.A); updateUI();" class="btn btn-secondary">Merge A -> C</button>
+                    <button onclick="counters.C.merge(counters.B); updateUI();" class="btn btn-secondary">Merge B -> C</button>
+                 </div>
+            </div>
+        </div>
+        
+        <!-- Step-by-Step Guide -->
+        <div class="card">
+            <h2 class="text-2xl font-bold mb-4">Try This Scenario</h2>
+            <div class="space-y-4 text-gray-700">
+                <p><strong>Step 1:</strong> Start by incrementing each replica a few times. For example:</p>
+                <ul class="list-disc list-inside ml-4">
+                    <li>Click "Increment A" <strong>2</strong> times.</li>
+                    <li>Click "Increment B" <strong>1</strong> time.</li>
+                    <li>Click "Increment C" <strong>3</strong> times.</li>
+                </ul>
+                <p class="mt-2">Notice how each replica only knows about its own changes. The total values are different.</p>
+                
+                <p><strong>Step 2 (Path 1):</strong> Now, let's sync them up. First, merge C into B, then merge the result into A.</p>
+                 <ul class="list-disc list-inside ml-4">
+                    <li>Click <strong>Merge C -> B</strong>. Observe B's state.</li>
+                    <li>Click <strong>Merge B -> A</strong>. Observe A's final state and value.</li>
+                </ul>
+                <p class="mt-2">Note the final payload and total value on Replica A.</p>
+
+                <p><strong>Step 3:</strong> Reset the page to try a different path.</p>
+
+                <p><strong>Step 4 (Path 2):</strong> Perform the same increments from Step 1. This time, merge A into B, then C into B.</p>
+                <ul class="list-disc list-inside ml-4">
+                    <li>Click <strong>Merge A -> B</strong>. Observe B's state.</li>
+                    <li>Click <strong>Merge C -> B</strong>. Observe B's final state and value.</li>
+                </ul>
+                 <p class="mt-2">Compare the final state on Replica B with the final state of Replica A from Path 1. <strong>They are identical!</strong> This is eventual consistency in action. The order of merges doesn't matter; the end result is the same.</p>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // --- CRDT LOGIC ---
+        class GCounter {
+            constructor(replicaId) {
+                this.replicaId = replicaId;
+                this.payload = { [this.replicaId]: 0 };
+            }
+
+            increment() {
+                this.payload[this.replicaId]++;
+            }
+
+            value() {
+                return Object.values(this.payload).reduce((sum, val) => sum + val, 0);
+            }
+
+            merge(otherCounter) {
+                // Use a Set to get all unique replica IDs from both payloads
+                const allReplicas = new Set([
+                    ...Object.keys(this.payload), 
+                    ...Object.keys(otherCounter.payload)
+                ]);
+                
+                const mergedPayload = {};
+                for (const replica of allReplicas) {
+                    // Get values, defaulting to 0 if a replica isn't in a payload
+                    const val1 = this.payload[replica] || 0;
+                    const val2 = otherCounter.payload[replica] || 0;
+                    // The core of the G-Counter merge: take the max
+                    mergedPayload[replica] = Math.max(val1, val2);
+                }
+                this.payload = mergedPayload;
+            }
+        }
+
+        // --- UI LOGIC ---
+        const counters = {
+            A: new GCounter('A'),
+            B: new GCounter('B'),
+            C: new GCounter('C')
+        };
+
+        function updateUI() {
+            for (const replicaId of ['A', 'B', 'C']) {
+                const counter = counters[replicaId];
+                
+                const payloadEl = document.getElementById(`payload-${replicaId}`);
+                const valueEl = document.getElementById(`value-${replicaId}`);
+
+                // Update payload text, nicely formatted
+                payloadEl.textContent = JSON.stringify(counter.payload, null, 2);
+                
+                // Update total value
+                valueEl.textContent = counter.value();
+            }
+        }
+
+        // Initial UI render on page load
+        window.onload = updateUI;
+    </script>
+
+</body>
+</html>
