@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>From Relative Position to Rotational Merging: A Mathematical Tutorial</title>
+    <!-- Chosen Palette: Academic Print -->
+    <!-- Application Structure Plan: A single-column, article-style layout designed for readability and printing. It directly follows the logical flow of the source report. This choice was made because the user requested a "PDF," which implies a static, linear document rather than an interactive application. The primary goal is a high-fidelity, printable representation of the content. -->
+    <!-- Visualization & Content Choices: Report Info: All text sections. -> Goal: Inform. -> Presentation: Formatted text using headings and paragraphs. -> Interaction: None (static). -> Justification: Matches the "PDF" request for a static document. -> Method: HTML + Tailwind. | Report Info: All LaTeX equations. -> Goal: Inform. -> Presentation: Rendered mathematical notation. -> Interaction: None (static). -> Justification: Essential for displaying the core mathematical concepts accurately. -> Library: KaTeX. -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" xintegrity="sha384-n8MVd4RsNIU0KOVEMVIARBEGraoMyNsUeGgULsoLd8eBBIIsATscGU1IiyGbasoConnect" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" xintegrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG+vnGctmUb0ZY0l8" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" xintegrity="sha384-+VBxd3r6XgURPl3dqSdxDYgJQib73KIhe9CQR3w5uKMXGRpvHQkK7FtEp/71IWI2" crossorigin="anonymous"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400..700;1,400..700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Lora', serif;
+            background-color: #f8fafc;
+        }
+        h1, h2, h3, h4, h5, h6 {
+            font-family: 'Inter', sans-serif;
+        }
+        .prose {
+            max-width: 80ch;
+        }
+        .prose p, .prose li {
+            font-size: 1.125rem;
+            line-height: 1.777;
+        }
+        .prose h1 {
+            font-size: 2.5rem;
+            line-height: 1.2;
+        }
+         .prose h2 {
+            font-size: 1.875rem;
+            line-height: 1.25;
+            margin-top: 2em;
+            padding-bottom: 0.3em;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .prose h3 {
+            font-size: 1.5rem;
+            line-height: 1.333;
+            margin-top: 1.6em;
+        }
+        .katex-display {
+            padding: 1em 0;
+            overflow-x: auto;
+            overflow-y: hidden;
+        }
+         @media print {
+            body {
+                background-color: #ffffff;
+            }
+            .no-print {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body class="text-slate-800">
+    <div class="prose prose-slate mx-auto px-4 py-12 md:py-16">
+        <header class="mb-12">
+            <h1 class="text-slate-900 font-bold text-center">From Relative Position to Rotational Merging: A Mathematical Tutorial</h1>
+        </header>
+
+        <main>
+            <p class="lead text-xl text-slate-600">This document provides a complete mathematical breakdown of the concepts presented in the interactive tutorial, from the core idea of Rotary Positional Embeddings (RoPE) to their application in building Conflict-free Replicated Data Types (CRDTs).</p>
+            
+            <hr class="my-12">
+
+            <section id="rope-intuition">
+                <h2>1. The RoPE Intuition</h2>
+                <p>The fundamental motivation behind RoPE is that in many contexts, like language, the <strong>relative position</strong> of items is more important than their absolute position. RoPE encodes position into a vector's rotation, making the relationship between vectors dependent only on their relative distance.</p>
+                <h3>Key Equations</h3>
+                <p>The goal is to find a function $f(x, p)$ that applies positional information $p$ to a vector $x$ such that the inner product (similarity) between two such vectors only depends on their relative distance, $m-n$.</p>
+                <p><strong>Goal:</strong></p>
+                $$ \langle f(x_m, m), f(x_n, n) \rangle = g(x_m, x_n, m - n) $$
+                <p><strong>RoPE's Solution (in 2D):</strong></p>
+                <p>RoPE achieves this by treating the vectors as complex numbers and multiplying them by a rotational term based on their position.</p>
+                $$ f(x, p) = x \cdot e^{i p \theta} $$
+                <p>Here, $e^{i p \theta}$ is a complex number representing a rotation by angle $p \cdot \theta$ on the complex plane.</p>
+                <p><strong>Resulting Inner Product:</strong></p>
+                <p>The inner product between two RoPE-encoded vectors, $v_m$ at position $m$ and $v_n$ at position $n$, simplifies beautifully. The dot product is equivalent to the real part of the multiplication of one vector with the conjugate of the other.</p>
+                $$ \langle v_m, v_n \rangle = \Re( (v_m)(v_n)^* ) = \Re( (x_m e^{im\theta}) (x_n e^{in\theta})^* ) $$
+                $$ = \Re( x_m x_n^* e^{im\theta} e^{-in\theta} ) = \Re( x_m x_n^* e^{i(m-n)\theta} ) $$
+                <p>If we assume the base vectors are simple real numbers (like in the visualization, where they are `[1,0]`), this simplifies to the cosine of the angle difference:</p>
+                $$ \langle v_m, v_n \rangle = \cos((m-n)\theta) $$
+                <p>This proves that the similarity depends only on the relative distance `m-n`.</p>
+            </section>
+            
+            <section id="visualizing-concepts">
+                <h2>2. Visualizing RoPE Concepts</h2>
+                <h3>Phase 1: 2D Rotation</h3>
+                <p>As derived above, the inner product between two vectors rotated by RoPE is calculated as the dot product:</p>
+                <ul>
+                    <li>Vector for position $m$: $v_m = [\cos(m\theta), \sin(m\theta)]$</li>
+                    <li>Vector for position $n$: $v_n = [\cos(n\theta), \sin(n\theta)]$</li>
+                </ul>
+                $$ \langle v_m, v_n \rangle = \cos(m\theta)\cos(n\theta) + \sin(m\theta)\sin(n\theta) $$
+                <p>Using the trigonometric identity $\cos(A - B) = \cos(A)\cos(B) + \sin(A)\sin(B)$, this simplifies to:</p>
+                $$ \langle v_m, v_n \rangle = \cos(m\theta - n\theta) = \cos((m-n)\theta) $$
+
+                <h3>Phase 2: 3D Rotation with Quaternions</h3>
+                <p>To extend rotation to 3D, we use quaternions. A quaternion $q = w + xi + yj + zk$ can represent a rotation.</p>
+                <ol>
+                    <li><strong>Vector as a Quaternion:</strong> A 3D vector $v = [v_x, v_y, v_z]$ is represented as a "pure" quaternion with a zero real part: $p = 0 + v_x i + v_y j + v_z k$.</li>
+                    <li><strong>Rotation Quaternion:</strong> A rotation by angle $\alpha$ around a normalized axis $A = [a_x, a_y, a_z]$ is defined as:
+                        $$ q_{rot} = \cos(\alpha/2) + (a_x i + a_y j + a_z k)\sin(\alpha/2) $$
+                        In the visualization, the rotation is around the Z-axis, so $A = [0, 0, 1]$.
+                    </li>
+                    <li><strong>Applying Rotation:</strong> The rotated vector $p'$ is found with the formula:
+                        $$ p' = q_{rot} \cdot p \cdot q_{rot}^{-1} $$
+                        where $q_{rot}^{-1}$ is the conjugate (inverse) of $q_{rot}$.
+                    </li>
+                </ol>
+
+                <h3>Phase 3: Context Compression</h3>
+                <p>We can use the extra dimensions of a 3D or higher-dimensional vector to encode `context`. The visualization shows how the Z-axis value is created from a weighted sum of parallel data streams.</p>
+                $$ Z_{context} = \sum_{k} w_k \cdot \text{value}_k $$
+                <p>This concept can be nested. A document's state can be the sum of its sections' states, and a section's state can be the sum of its paragraphs' states. This allows complex, hierarchical data to be represented and merged using simple, commutative vector addition at every level.</p>
+            </section>
+
+            <section id="rope-for-crdts">
+                <h2>3. Applying RoPE Logic to CRDTs</h2>
+                <p>The conceptual leap is to substitute <strong>position</strong> with <strong>time</strong>. The state of a distributed system can then be represented as the vector sum of all operations it has observed.</p>
+                <h3>Phase 1: Theory</h3>
+                <ul>
+                    <li><strong>Single Operation Vector:</strong> An operation `op` with a `value` and `time` is converted into a vector:
+                        $$ f(\text{op}) = \text{value} \cdot e^{i \cdot \text{time} \cdot \theta} $$
+                    </li>
+                    <li><strong>Total State Vector:</strong> The state $S$ of a peer is the vector sum of all operations it has seen:
+                        $$ S = \sum_{j} f(\text{op}_j) $$
+                    </li>
+                </ul>
+
+                <h3>Phase 2: Interactive Merge</h3>
+                <p>The visualization demonstrates how two peers, A and B, calculate their state and how those states merge.</p>
+                <ul>
+                    <li><strong>State A Calculation ($S_A$):</strong> State A has two operations, $op_{A1}$ and $op_{A2}$. Its state is the sum of their corresponding vectors, $v_{A1}$ and $v_{A2}$.
+                        $$ S_A = v_{A1} + v_{A2} $$
+                        Each vector is calculated as: $v = [\text{value} \cdot \cos(\text{time} \cdot \theta), \text{value} \cdot \sin(\text{time} \cdot \theta)]$
+                    </li>
+                    <li><strong>State B Calculation ($S_B$):</strong> The same logic applies to State B and its operations.</li>
+                    <li><strong>Merged State ($S_{merged}$):</strong> Because vector addition is commutative and associative, the final merged state is simply the sum of the individual peer states. This guarantees convergence.
+                        $$ S_{merged} = S_A + S_B $$
+                    </li>
+                </ul>
+            </section>
+            
+            <section id="crdt-simulation">
+                <h2>4. CRDT Simulation: Rotational State Merge</h2>
+                <p>This simulation models a "Last-Write-Wins" CRDT. The global state is the sum of the single latest operation from each participating agent.</p>
+                <h3>Phasor Diagram Mathematics</h3>
+                <ul>
+                    <li><strong>Agent's Vector ($v_i$):</strong> The vector for agent *i* is based on its latest operation's `value` and `time`:
+                        $$ v_i = [\text{value}_i \cdot \cos(\text{time}_i \cdot \theta), \quad \text{value}_i \cdot \sin(\text{time}_i \cdot \theta)] $$
+                    </li>
+                    <li><strong>Global State Vector ($S_{global}$):</strong> The final purple vector is the sum of the latest vector from all agents:
+                        $$ S_{global} = \sum_{i=1}^{N_{agents}} v_i $$
+                    </li>
+                </ul>
+                <h3>Interference Graph Mathematics</h3>
+                <p>This graph shows the same information in the form of waves.</p>
+                <ul>
+                    <li><strong>Agent's Wave ($y_i(x)$):</strong> Each agent's latest operation is a sine wave where the `value` is the amplitude and the `time` creates a phase shift.
+                        $$ y_i(x) = \text{value}_i \cdot \sin(k \cdot x + \text{time}_i \cdot \theta) $$
+                        (Here, $k$ is a visual scaling constant).
+                    </li>
+                    <li><strong>Global State Wave ($y_{global}(x)$):</strong> The final purple wave is the sum of the individual agent waves.
+                        $$ y_{global}(x) = \sum_{i=1}^{N_{agents}} y_i(x) $$
+                    </li>
+                </ul>
+                <p>This concludes the mathematical foundation of the tutorial, showing how rotary embeddings provide a robust and scalable method for creating convergent distributed systems.</p>
+            </section>
+
+        </main>
+        
+        <footer class="mt-16 pt-8 border-t border-slate-200 text-center text-slate-500 text-sm no-print">
+            <p>Generated for printing.</p>
+        </footer>
+
+    </div>
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            renderMathInElement(document.body, {
+                delimiters: [
+                    {left: "$$", right: "$$", display: true},
+                    {left: "$", right: "$", display: false}
+                ],
+                throwOnError: false
+            });
+        });
+    </script>
+</body>
+</html>
