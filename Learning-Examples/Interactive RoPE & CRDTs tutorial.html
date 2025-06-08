@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Tutorial: RoPE & CRDTs</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" xintegrity="sha384-n8MVd4RsNIU0KOVEMVIARBEGraoMyNsUeGgULsoLd8eBBIIsATscGU1IiyGbasoConnect" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" xintegrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG+vnGctmUb0ZY0l8" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" xintegrity="sha384-+VBxd3r6XgURPl3dqSdxDYgJQib73KIhe9CQR3w5uKMXGRpvHQkK7FtEp/71IWI2" crossorigin="anonymous"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f0f2f5; }
+        .step-content { transition: opacity 0.5s ease-in-out, transform 0.5s ease-in-out; }
+        .step-content.hidden { opacity: 0; transform: translateY(20px); display: none; }
+        .katex { font-size: 1.1em; }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 20px; height: 20px; background: #4f46e5; cursor: pointer; border-radius: 50%; }
+        input[type=range]::-moz-range-thumb { width: 20px; height: 20px; background: #4f46e5; cursor: pointer; border-radius: 50%; }
+        canvas { background-color: #fff; border-radius: 0.5rem; border: 1px solid #e2e8f0; }
+        .phase-btn.active, .phase-btn-step3.active { border-color: #4f46e5; background-color: #eef2ff; color: #4338ca; }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+    <div class="container mx-auto p-4 md:p-8">
+        <header class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-gray-900">From Relative Position to Rotational Merging</h1>
+            <p class="text-xl text-gray-600 mt-2">An Interactive Journey into RoPE and CRDTs</p>
+        </header>
+
+        <div id="stepper" class="flex justify-center border-b border-gray-300 mb-8 space-x-4 md:space-x-8">
+            <button data-step="1" class="step-btn text-sm md:text-base font-medium p-4 border-b-2 border-transparent text-gray-500 hover:border-gray-400 hover:text-gray-700">1. The RoPE Intuition</button>
+            <button data-step="2" class="step-btn text-sm md:text-base font-medium p-4 border-b-2 border-transparent text-gray-500 hover:border-gray-400 hover:text-gray-700">2. Interactive RoPE</button>
+            <button data-step="3" class="step-btn text-sm md:text-base font-medium p-4 border-b-2 border-transparent text-gray-500 hover:border-gray-400 hover:text-gray-700">3. RoPE for CRDTs</button>
+            <button data-step="4" class="step-btn text-sm md:text-base font-medium p-4 border-b-2 border-indigo-600 text-indigo-600">4. CRDT Simulation</button>
+        </div>
+
+        <div id="step-1" class="step-content hidden bg-white p-6 md:p-8 rounded-xl shadow-lg">
+             <h2 class="text-2xl font-bold mb-4 text-gray-800">What is RoPE and Why Does It Work?</h2>
+            <div class="prose max-w-none text-gray-700 leading-relaxed">
+                <p>In many systems, especially in language models, we don't care about an item's absolute position. Instead, we care about its <strong>relative position</strong> to other items. For example, knowing a word is "3 words after" another is more useful than knowing it's the "157th word in the document."</p>
+                <p>Rotary Positional Embeddings (RoPE) solve this by encoding position in a clever way: through rotation.</p>
+                <h3 class="text-xl font-semibold mt-6 mb-3">The Core Idea</h3>
+                <p>Imagine each word's embedding as a point in a 2D plane. RoPE takes this point and rotates it by an angle proportional to its position. A word at position `m` is rotated by an angle of `m * θ`, where `θ` is a constant.</p>
+                <div class="bg-indigo-50 p-6 rounded-lg my-6 border border-indigo-200">
+                    <h4 class="font-bold text-indigo-800 mb-3">Key Equations</h4>
+                    <p>The goal is to define a function `g` where the similarity (inner product) between a query `q` and a key `k` only depends on their relative distance `m-n`.</p>
+                    <div class="my-4">
+                        <p><strong>Goal:</strong> $$ \langle f_q(x_m, m), f_k(x_n, n) \rangle = g(x_m, x_n, m - n) $$</p>
+                    </div>
+                    <div class="my-4">
+                        <p><strong>RoPE's Solution (in 2D):</strong> $$ f(x, p) = x \cdot e^{i p \theta} $$</p>
+                    </div>
+                     <div class="my-4">
+                        <p><strong>Resulting Inner Product:</strong> $$ \langle f(x_m, m), f(x_n, n) \rangle = \Re( (W_q x_m)(W_k x_n)^* e^{i(m-n)\theta} ) $$ </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="step-2" class="step-content hidden bg-white p-6 md:p-8 rounded-xl shadow-lg">
+            <h2 class="text-2xl font-bold mb-4 text-gray-800">Visualizing RoPE's Rotations</h2>
+            <div class="mb-6 border-b border-gray-200">
+                <nav class="-mb-px flex space-x-6" aria-label="Tabs">
+                    <button data-phase="1" class="phase-btn active whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm">Phase 1: 2D Rotation</button>
+                    <button data-phase="2" class="phase-btn whitespace-nowrap py-3 px-1 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700">Phase 2: 3D Rotation</button>
+                    <button data-phase="3" class="phase-btn whitespace-nowrap py-3 px-1 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700">Phase 3: Context Compression</button>
+                </nav>
+            </div>
+            <div id="phase-1-content" class="phase-content">
+                <div class="grid md:grid-cols-3 gap-6"><div class="md:col-span-2"><canvas id="rope-canvas" width="600" height="400"></canvas></div><div id="rope-controls" class="space-y-4"></div></div>
+            </div>
+            <div id="phase-2-content" class="phase-content hidden">
+                 <div class="prose max-w-none text-gray-700 leading-relaxed mb-6">
+                    <p>Using <strong>Quaternions</strong> ($w + xi + yj + zk$), we extend RoPE to 3D. The Z-axis can represent a compressed summary of parallel data streams: $ Z_{\text{pos}} = \sum w_i \cdot {\text{stream}}_i $.</p>
+                </div>
+                <div class="grid md:grid-cols-3 gap-6"><div class="md:col-span-2"><canvas id="quat-canvas" width="600" height="400"></canvas></div><div id="quat-controls" class="space-y-4"></div></div>
+            </div>
+            <div id="phase-3-content" class="phase-content hidden">
+                 <div class="prose max-w-none text-gray-700 leading-relaxed mb-6">
+                    <h4 class="text-lg font-semibold mt-4 mb-2">Multi-Stream Context Compression</h4>
+                    <p>This graph shows "context" streams feeding a central "operator" node. The operator's Z-position is the weighted sum of these contexts, visualizing how parallel data can be compressed into a single state.</p>
+                </div>
+                <div class="grid lg:grid-cols-2 gap-8"><div><h3 class="text-xl font-semibold text-center mb-2">Context Graph</h3><canvas id="context-graph-canvas" width="450" height="450"></canvas></div><div id="context-controls" class="space-y-4"></div></div>
+            </div>
+        </div>
+
+        <div id="step-3" class="step-content hidden bg-white p-6 md:p-8 rounded-xl shadow-lg">
+            <h2 class="text-2xl font-bold mb-4 text-gray-800">Applying RoPE Logic to CRDTs</h2>
+            <div class="mb-6 border-b border-gray-200">
+                <nav class="-mb-px flex space-x-6" aria-label="Tabs">
+                    <button data-phase="3-1" class="phase-btn-step3 active whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm">Phase 1: Theory</button>
+                    <button data-phase="3-2" class="phase-btn-step3 whitespace-nowrap py-3 px-1 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700">Phase 2: Interactive Merge</button>
+                </nav>
+            </div>
+            <div id="phase-3-1-content" class="phase-content-step3">
+                <div class="prose max-w-none text-gray-700 leading-relaxed">
+                    <h3 class="text-xl font-semibold mt-6 mb-3">From Position to Time</h3>
+                    <p>The core insight of RoPE is that the inner product, a measure of similarity, depends only on the <i>relative</i> distance between two points. We can apply this exact same logic to distributed systems by making a simple substitution: replace <strong>position</strong> with <strong>time</strong>.</p>
+                    <p>In a Conflict-free Replicated Data Type (CRDT), we don't care about when an operation was created in absolute, universal time. We care about its relationship to other operations. By encoding an operation's timestamp into a rotation, we gain similar benefits to RoPE in language models.</p>
+                    
+                    <div class="bg-indigo-50 p-6 rounded-lg my-6 border border-indigo-200">
+                        <h4 class="font-bold text-indigo-800 mb-3">State as a Vector Sum</h4>
+                        <p>Imagine each operation is a 2D vector defined by its value and timestamp: $op = (\text{value}, \text{time})$. We can represent this as a complex number and apply a rotation based on its timestamp:</p>
+                        <p class="my-4 text-center">$$ f(\text{op}) = \text{value} \cdot e^{i \cdot \text{time} \cdot \theta} $$</p>
+                        <p>The total state of a system (or a single peer) is simply the <strong>vector sum</strong> of all the unique operations it has observed:</p>
+                        <p class="my-4 text-center">$$ S = \sum_{j} f(\text{op}_j) $$</p>
+                        <p>Because vector addition is commutative and associative, the final state is independent of the order in which operations are received. This provides a powerful foundation for a CRDT, ensuring all peers converge to the same state.</p>
+                    </div>
+                </div>
+            </div>
+            <div id="phase-3-2-content" class="phase-content-step3 hidden">
+                <div class="grid md:grid-cols-3 gap-6"><div class="md:col-span-2"><canvas id="crdt-merge-canvas" width="600" height="400"></canvas></div><div id="crdt-merge-controls" class="space-y-4"></div></div>
+            </div>
+        </div>
+        
+        <div id="step-4" class="step-content bg-white p-6 md:p-8 rounded-xl shadow-lg">
+            <h2 class="text-2xl font-bold mb-4 text-gray-800">CRDT Simulation: Rotational State Merge</h2>
+            <div class="prose max-w-none text-gray-700 leading-relaxed mb-6">
+                <p>This final simulation brings all our concepts together. Multiple agents (colored dots) are submitting operations over time. The system's global state is defined as the vector sum of the <strong>latest operation from each agent</strong>. This ensures the state is always bounded and convergent.</p>
+                <p>The <strong>Phasor Diagram</strong> on the left shows each agent's latest operation vector and the resulting global state vector (purple). The <strong>Interference Graph</strong> on the right shows each agent's contribution as a wave and their sum, illustrating how they constructively or destructively interfere to create the final state.</p>
+            </div>
+            <div id="crdt-sim-controls" class="flex flex-wrap items-center justify-center gap-4 mb-6 p-4 bg-gray-50 rounded-lg"></div>
+            <div class="grid lg:grid-cols-2 gap-6">
+                 <div>
+                    <h3 class="text-lg font-semibold text-center mb-2">Phasor Diagram</h3>
+                    <canvas id="crdt-sim-phasor-canvas" width="500" height="500"></canvas>
+                 </div>
+                 <div>
+                    <h3 class="text-lg font-semibold text-center mb-2">Interference Graph</h3>
+                    <canvas id="crdt-sim-wave-canvas" width="500" height="500"></canvas>
+                 </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const renderMath = () => {
+            try {
+                if (window.renderMathInElement) {
+                    renderMathInElement(document.body, { 
+                        delimiters: [ {left: '$$', right: '$$', display: true}, {left: '$', right: '$', display: false} ],
+                        throwOnError: false
+                    });
+                }
+            } catch (error) { console.error("KaTeX rendering failed:", error); }
+        };
+        
+        if (window.renderMathInElement) {
+            renderMath();
+        } else {
+            const katexScript = document.querySelector('script[src*="katex.min.js"]');
+            if (katexScript) katexScript.onload = renderMath;
+        }
+        
+        const stepperButtons = document.querySelectorAll('.step-btn');
+        const stepContents = document.querySelectorAll('.step-content');
+        let ropeCanvasInitialized = false, quatCanvasInitialized = false, contextGraphInitialized = false, crdtMergeInitialized = false, crdtSimInitialized = false;
+
+        function switchStep(targetStep) {
+            stepperButtons.forEach(btn => {
+                const isActive = btn.getAttribute('data-step') === targetStep;
+                btn.classList.toggle('border-indigo-600', isActive);
+                btn.classList.toggle('text-indigo-600', isActive);
+                btn.classList.toggle('border-transparent', !isActive);
+                btn.classList.toggle('text-gray-500', !isActive);
+            });
+            stepContents.forEach(content => {
+                const isTarget = content.id === `step-${targetStep}`;
+                if (isTarget) {
+                    content.style.display = 'block';
+                    setTimeout(() => {
+                        content.classList.remove('hidden');
+                        if (window.renderMathInElement) renderMathInElement(content);
+                    }, 10);
+                    if (targetStep === '2') initializeCanvasesForStep2();
+                    if (targetStep === '3') initializeCanvasesForStep3();
+                    if (targetStep === '4') initializeCrdtSimulation();
+                } else {
+                    content.classList.add('hidden');
+                    setTimeout(() => { content.style.display = 'none'; }, 500);
+                }
+            });
+        }
+        stepperButtons.forEach(b => b.addEventListener('click', () => switchStep(b.getAttribute('data-step'))));
+
+        function setupPhaseSwitching(btnClass, contentClass) {
+            const phaseButtons = document.querySelectorAll(`.${btnClass}`);
+            const phaseContents = document.querySelectorAll(`.${contentClass}`);
+            phaseButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    const targetPhase = button.getAttribute('data-phase');
+                    phaseButtons.forEach(btn => btn.classList.toggle('active', btn.getAttribute('data-phase') === targetPhase));
+                    phaseContents.forEach(content => content.classList.toggle('hidden', content.id !== `phase-${targetPhase}-content`));
+                });
+            });
+        }
+        
+        setupPhaseSwitching('phase-btn', 'phase-content');
+        setupPhaseSwitching('phase-btn-step3', 'phase-content-step3');
+
+        function initializeCanvasesForStep2() { 
+            if (!ropeCanvasInitialized) { initRopeCanvas(); ropeCanvasInitialized = true; } 
+            if (!quatCanvasInitialized) { initQuatCanvas(); quatCanvasInitialized = true; } 
+            if (!contextGraphInitialized) { initContextGraph(); contextGraphInitialized = true; } 
+        }
+        function initializeCanvasesForStep3() { if (!crdtMergeInitialized) { initCrdtMergeCanvas(); crdtMergeInitialized = true; } }
+        function initializeCrdtSimulation() { if (!crdtSimInitialized) { initCrdtSimulation(); crdtSimInitialized = true; } }
+        
+        function createSlider(id, label, min, max, value, step) { return `<div><label for="${id}" class="block text-sm font-medium text-gray-700">${label}</label><div class="flex items-center space-x-3"><input type="range" id="${id}" min="${min}" max="${max}" value="${value}" step="${step}" class="w-full"><span id="${id}-val" class="font-mono text-gray-600 w-12 text-center">${value}</span></div></div>`; }
+        function createResultDisplay(id, label, value) { return `<div class="bg-gray-50 p-3 rounded-lg"><div class="flex justify-between items-center"><span class="text-sm font-medium text-gray-800">${label}:</span><span id="${id}" class="font-mono text-lg font-semibold text-indigo-600">${value}</span></div></div>`; }
+
+        // --- STEP 2, PHASE 1: 2D RoPE ---
+        function initRopeCanvas() {
+            const canvas = document.getElementById('rope-canvas');
+            const controlsContainer = document.getElementById('rope-controls');
+            if (!canvas || !controlsContainer) return;
+            const ctx = canvas.getContext('2d');
+            
+            const state = { m: 5, n: 2, theta: 0.2 };
+            
+            controlsContainer.innerHTML = 
+                createSlider('rope-m', 'Position m (blue)', 0, 50, state.m, 1) +
+                createSlider('rope-n', 'Position n (red)', 0, 50, state.n, 1) +
+                createSlider('rope-theta', 'Theta', 0.05, 1, state.theta, 0.01) +
+                '<hr class="my-4">' +
+                createResultDisplay('rope-dist', 'Relative Distance (m-n)', (state.m - state.n).toFixed(2)) +
+                createResultDisplay('rope-dot', 'Inner Product', '1.00');
+
+            const mSlider = document.getElementById('rope-m');
+            const nSlider = document.getElementById('rope-n');
+            const thetaSlider = document.getElementById('rope-theta');
+            const mVal = document.getElementById('rope-m-val');
+            const nVal = document.getElementById('rope-n-val');
+            const thetaVal = document.getElementById('rope-theta-val');
+            const distDisplay = document.getElementById('rope-dist');
+            const dotDisplay = document.getElementById('rope-dot');
+
+            function draw() {
+                const center = { x: canvas.width / 2, y: canvas.height / 2 };
+                const scale = canvas.height / 2 - 20;
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                ctx.strokeStyle = '#cbd5e1'; ctx.lineWidth = 1;
+                ctx.beginPath(); ctx.moveTo(0, center.y); ctx.lineTo(canvas.width, center.y); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(center.x, 0); ctx.lineTo(center.x, canvas.height); ctx.stroke();
+                
+                const angleM = state.m * state.theta;
+                const vecM = { x: Math.cos(angleM), y: Math.sin(angleM) };
+                const angleN = state.n * state.theta;
+                const vecN = { x: Math.cos(angleN), y: Math.sin(angleN) };
+                
+                ctx.beginPath(); ctx.moveTo(center.x, center.y); ctx.lineTo(center.x + vecM.x * scale, center.y - vecM.y * scale); ctx.strokeStyle = '#3b82f6'; ctx.lineWidth = 3; ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(center.x, center.y); ctx.lineTo(center.x + vecN.x * scale, center.y - vecN.y * scale); ctx.strokeStyle = '#ef4444'; ctx.lineWidth = 3; ctx.stroke();
+                
+                const dotProduct = vecM.x * vecN.x + vecM.y * vecN.y;
+                distDisplay.textContent = (state.m - state.n).toFixed(0);
+                dotDisplay.textContent = dotProduct.toFixed(4);
+            }
+
+            mSlider.addEventListener('input', (e) => { state.m = parseFloat(e.target.value); mVal.textContent = state.m; draw(); });
+            nSlider.addEventListener('input', (e) => { state.n = parseFloat(e.target.value); nVal.textContent = state.n; draw(); });
+            thetaSlider.addEventListener('input', (e) => { state.theta = parseFloat(e.target.value); thetaVal.textContent = state.theta.toFixed(2); draw(); });
+
+            draw();
+        }
+        
+        // --- STEP 2, PHASE 2: 3D RoPE ---
+        function initQuatCanvas() {
+            const canvas = document.getElementById('quat-canvas');
+            const controlsContainer = document.getElementById('quat-controls');
+            if (!canvas || !controlsContainer) return;
+            const ctx = canvas.getContext('2d');
+
+            const state = { x: 80, y: 50, z: 60, angle: 0 };
+
+            controlsContainer.innerHTML =
+                createSlider('quat-x', 'Vector X', -100, 100, state.x, 1) +
+                createSlider('quat-y', 'Vector Y', -100, 100, state.y, 1) +
+                createSlider('quat-z', 'Vector Z (Context)', -100, 100, state.z, 1) +
+                createSlider('quat-angle', 'Rotation Angle', 0, 2 * Math.PI, state.angle, 0.1);
+
+            const xSlider = document.getElementById('quat-x');
+            const ySlider = document.getElementById('quat-y');
+            const zSlider = document.getElementById('quat-z');
+            const angleSlider = document.getElementById('quat-angle');
+
+            function project(x, y, z) {
+                const angle = Math.PI / 6;
+                const x_proj = (x - y) * Math.cos(angle);
+                const y_proj = (x + y) * Math.sin(angle) - z;
+                return { x: canvas.width / 2 + x_proj, y: canvas.height / 2 + y_proj };
+            }
+
+            function draw() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                const axisLength = 150;
+                ctx.strokeStyle = '#9ca3af'; ctx.lineWidth = 1; ctx.font = '12px Inter';
+                const origin = project(0,0,0);
+                const xAxis = project(axisLength, 0, 0);
+                const yAxis = project(0, axisLength, 0);
+                const zAxis = project(0, 0, axisLength);
+                ctx.beginPath(); ctx.moveTo(origin.x, origin.y); ctx.lineTo(xAxis.x, xAxis.y); ctx.stroke(); ctx.fillText('X', xAxis.x + 5, xAxis.y);
+                ctx.beginPath(); ctx.moveTo(origin.x, origin.y); ctx.lineTo(yAxis.x, yAxis.y); ctx.stroke(); ctx.fillText('Y', yAxis.x + 5, yAxis.y);
+                ctx.beginPath(); ctx.moveTo(origin.x, origin.y); ctx.lineTo(origin.x, zAxis.y); ctx.stroke(); ctx.fillText('Z', origin.x, zAxis.y - 5);
+
+                const p0 = project(state.x, state.y, state.z);
+                ctx.beginPath(); ctx.moveTo(origin.x, origin.y); ctx.lineTo(p0.x, p0.y); ctx.strokeStyle = '#6b7280'; ctx.setLineDash([5, 5]); ctx.stroke(); ctx.setLineDash([]);
+                ctx.beginPath(); ctx.arc(p0.x, p0.y, 5, 0, 2 * Math.PI); ctx.fillStyle = '#6b7280'; ctx.fill();
+
+                const cosA = Math.cos(state.angle); const sinA = Math.sin(state.angle);
+                const rotX = state.x * cosA - state.y * sinA; const rotY = state.x * sinA + state.y * cosA;
+                const p1 = project(rotX, rotY, state.z);
+
+                ctx.beginPath(); ctx.moveTo(origin.x, origin.y); ctx.lineTo(p1.x, p1.y); ctx.strokeStyle = '#4f46e5'; ctx.lineWidth = 2; ctx.stroke();
+                ctx.beginPath(); ctx.arc(p1.x, p1.y, 6, 0, 2 * Math.PI); ctx.fillStyle = '#4f46e5'; ctx.fill();
+            }
+
+            [xSlider, ySlider, zSlider, angleSlider].forEach(slider => {
+                slider.addEventListener('input', (e) => {
+                    state[e.target.id.split('-')[1]] = parseFloat(e.target.value);
+                    document.getElementById(e.target.id + '-val').textContent = e.target.value;
+                    draw();
+                });
+            });
+            draw();
+        }
+
+        // --- STEP 2, PHASE 3: Context Graph ---
+        function initContextGraph() {
+            const canvas = document.getElementById('context-graph-canvas');
+            const controlsContainer = document.getElementById('context-controls');
+            if (!canvas || !controlsContainer) return;
+            const ctx = canvas.getContext('2d');
+            
+            const state = {
+                contexts: [
+                    { name: 'Stream A', value: 0.8, weight: 0.5, color: '#3b82f6' },
+                    { name: 'Stream B', value: -0.5, weight: 0.2, color: '#ef4444' },
+                    { name: 'Stream C', value: 1.2, weight: 0.8, color: '#10b981' },
+                ]
+            };
+
+            let controlsHTML = '';
+            state.contexts.forEach((c, i) => {
+                controlsHTML += createSlider(`ctx-${i}-w`, `${c.name} Weight`, 0, 1, c.weight, 0.05);
+            });
+            controlsHTML += '<hr class="my-4">';
+            controlsHTML += createResultDisplay('ctx-z-pos', 'Operator Z-Position', '0.00');
+            controlsContainer.innerHTML = controlsHTML;
+            
+            const zPosDisplay = document.getElementById('ctx-z-pos');
+            
+            function draw() {
+                const center = { x: canvas.width / 2, y: canvas.height / 2 };
+                const radius = canvas.width / 2 - 60;
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                ctx.beginPath(); ctx.arc(center.x, center.y, 30, 0, 2 * Math.PI); ctx.fillStyle = '#4338ca'; ctx.fill();
+                ctx.fillStyle = 'white'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = '14px Inter';
+                ctx.fillText('Op', center.x, center.y);
+
+                let totalZ = 0;
+                state.contexts.forEach((c, i) => {
+                    const angle = (i / state.contexts.length) * 2 * Math.PI - Math.PI / 2;
+                    const nodePos = { x: center.x + radius * Math.cos(angle), y: center.y + radius * Math.sin(angle) };
+                    
+                    ctx.beginPath(); ctx.moveTo(nodePos.x, nodePos.y); ctx.lineTo(center.x, center.y);
+                    ctx.strokeStyle = c.color; ctx.lineWidth = 1 + c.weight * 8; ctx.globalAlpha = 0.4 + c.weight * 0.6; ctx.stroke();
+                    ctx.globalAlpha = 1.0;
+
+                    ctx.beginPath(); ctx.arc(nodePos.x, nodePos.y, 20, 0, 2 * Math.PI); ctx.fillStyle = c.color; ctx.fill();
+                    ctx.fillStyle = 'white'; ctx.fillText(c.name.split(' ')[1], nodePos.x, nodePos.y);
+                    ctx.fillStyle = '#374151';
+                    ctx.fillText(`val: ${c.value}`, nodePos.x, nodePos.y + 30);
+                    ctx.fillText(`w: ${c.weight.toFixed(2)}`, nodePos.x, nodePos.y + 45);
+                    totalZ += c.value * c.weight;
+                });
+                zPosDisplay.textContent = totalZ.toFixed(4);
+            }
+
+            state.contexts.forEach((c, i) => {
+                const slider = document.getElementById(`ctx-${i}-w`);
+                slider.addEventListener('input', e => {
+                    const weight = parseFloat(e.target.value);
+                    state.contexts[i].weight = weight;
+                    document.getElementById(`ctx-${i}-w-val`).textContent = weight.toFixed(2);
+                    draw();
+                });
+            });
+            draw();
+        }
+
+        // --- STEP 3, PHASE 2: Interactive CRDT Merge ---
+        function initCrdtMergeCanvas() {
+            const canvas = document.getElementById('crdt-merge-canvas');
+            const controlsContainer = document.getElementById('crdt-merge-controls');
+            if (!canvas || !controlsContainer) return;
+            const ctx = canvas.getContext('2d');
+            
+            const state = {
+                theta: 0.4,
+                ops_a: [{ val: 1.0, time: 2 }, { val: -0.8, time: 5 }],
+                ops_b: [{ val: 0.7, time: 3 }, { val: 0.9, time: 8 }]
+            };
+
+            let controlsHTML = '<div><h4 class="font-semibold text-blue-600">State A (Blue)</h4>' +
+                createSlider('crdt-a0-val', 'Op 1 (t=2) Value', -1, 1, state.ops_a[0].val, 0.1) +
+                createSlider('crdt-a1-val', 'Op 2 (t=5) Value', -1, 1, state.ops_a[1].val, 0.1) +
+                '</div><hr><di><h4 class="font-semibold text-red-600">State B (Red)</h4>' +
+                createSlider('crdt-b0-val', 'Op 1 (t=3) Value', -1, 1, state.ops_b[0].val, 0.1) +
+                createSlider('crdt-b1-val', 'Op 2 (t=8) Value', -1, 1, state.ops_b[1].val, 0.1) +
+                '</div>';
+            controlsContainer.innerHTML = controlsHTML;
+
+            function calculateSum(ops) {
+                return ops.reduce((acc, op) => {
+                    const angle = op.time * state.theta;
+                    acc.re += op.val * Math.cos(angle);
+                    acc.im += op.val * Math.sin(angle);
+                    return acc;
+                }, { re: 0, im: 0 });
+            }
+
+            function drawVector(vec, color, lineWidth = 3) {
+                const center = { x: canvas.width / 2, y: canvas.height / 2 };
+                const scale = canvas.height / 3;
+                ctx.beginPath(); ctx.moveTo(center.x, center.y);
+                ctx.lineTo(center.x + vec.re * scale, center.y - vec.im * scale);
+                ctx.strokeStyle = color; ctx.lineWidth = lineWidth; ctx.stroke();
+            }
+
+            function draw() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                const center = { x: canvas.width / 2, y: canvas.height / 2 };
+                
+                ctx.strokeStyle = '#cbd5e1'; ctx.lineWidth = 1;
+                ctx.beginPath(); ctx.moveTo(0, center.y); ctx.lineTo(canvas.width, center.y); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(center.x, 0); ctx.lineTo(center.x, canvas.height); ctx.stroke();
+
+                const stateA = calculateSum(state.ops_a);
+                state.ops_a.forEach(op => {
+                     const vec = { re: op.val * Math.cos(op.time * state.theta), im: op.val * Math.sin(op.time * state.theta) };
+                     drawVector(vec, '#60a5fa', 1);
+                });
+                drawVector(stateA, '#2563eb');
+
+                const stateB = calculateSum(state.ops_b);
+                state.ops_b.forEach(op => {
+                     const vec = { re: op.val * Math.cos(op.time * state.theta), im: op.val * Math.sin(op.time * state.theta) };
+                     drawVector(vec, '#f87171', 1);
+                });
+                drawVector(stateB, '#dc2626');
+
+                const mergedState = { re: stateA.re + stateB.re, im: stateA.im + stateB.im };
+                drawVector(mergedState, '#7c3aed', 4);
+            }
+            
+            ['a0', 'a1', 'b0', 'b1'].forEach((id) => {
+                const slider = document.getElementById(`crdt-${id}-val`);
+                slider.addEventListener('input', e => {
+                    const val = parseFloat(e.target.value);
+                    const peer = id.startsWith('a') ? 'ops_a' : 'ops_b';
+                    const opIndex = id.endsWith('0') ? 0 : 1;
+                    state[peer][opIndex].val = val;
+                    document.getElementById(`crdt-${id}-val-val`).textContent = val.toFixed(1);
+                    draw();
+                });
+            });
+            draw();
+        }
+
+        // --- STEP 4: FIXED CRDT SIMULATION ---
+        function initCrdtSimulation() {
+            const pCanvas = document.getElementById('crdt-sim-phasor-canvas');
+            const wCanvas = document.getElementById('crdt-sim-wave-canvas');
+            if (!pCanvas || !wCanvas) return;
+            const pCtx = pCanvas.getContext('2d');
+            const wCtx = wCanvas.getContext('2d');
+            const controlsContainer = document.getElementById('crdt-sim-controls');
+            
+            let animationFrameId;
+            let state = {
+                agents: [],
+                latestOps: {},
+                tick: 0,
+                theta: 0.1 * Math.PI / 4,
+                speed: 500,
+                isRunning: true,
+                numAgents: 3,
+                lastOpTime: 0,
+            };
+            const agentColors = ['#3b82f6', '#ef4444', '#10b981', '#f97316', '#8b5cf6'];
+            
+            controlsContainer.innerHTML = `
+                <button id="run-pause-btn" class="px-4 py-2 bg-indigo-600 text-white font-semibold rounded-md shadow-sm hover:bg-indigo-700">Pause</button>
+                <button id="reset-btn" class="px-4 py-2 bg-gray-600 text-white font-semibold rounded-md shadow-sm hover:bg-gray-700">Reset</button>
+                <div class="flex items-center gap-2">
+                    <label for="speed-slider" class="text-sm font-medium">Speed:</label>
+                    <input type="range" id="speed-slider" min="50" max="2000" value="1550" step="50">
+                </div>
+                <div class="flex items-center gap-2">
+                    <label for="agents-slider" class="text-sm font-medium">Agents:</label>
+                    <input type="range" id="agents-slider" min="1" max="5" value="3" step="1">
+                </div>
+                <div id="tick-display" class="font-mono text-lg">Tick: 0</div>`;
+            
+            const runPauseBtn = document.getElementById('run-pause-btn');
+            const resetBtn = document.getElementById('reset-btn');
+            const speedSlider = document.getElementById('speed-slider');
+            const agentsSlider = document.getElementById('agents-slider');
+            const tickDisplay = document.getElementById('tick-display');
+
+            function reset() {
+                state.tick = 0;
+                state.latestOps = {};
+                state.numAgents = parseInt(agentsSlider.value);
+                state.agents = [];
+                for(let i=0; i<state.numAgents; i++) {
+                    const agent = { id: i, color: agentColors[i], lastVal: (Math.random()-0.5) };
+                    state.agents.push(agent);
+                    state.latestOps[i] = { agentId: i, value: agent.lastVal, time: 0 };
+                }
+                tickDisplay.textContent = `Tick: 0`;
+            }
+
+            runPauseBtn.addEventListener('click', () => {
+                state.isRunning = !state.isRunning;
+                runPauseBtn.textContent = state.isRunning ? 'Pause' : 'Run';
+            });
+            resetBtn.addEventListener('click', reset);
+            speedSlider.addEventListener('input', () => state.speed = 2050 - parseInt(speedSlider.value));
+            agentsSlider.addEventListener('input', reset);
+
+            function addOperation() {
+                if (state.agents.length === 0) return;
+                const agentIndex = Math.floor(Math.random() * state.numAgents);
+                const agent = state.agents[agentIndex];
+                agent.lastVal += (Math.random() - 0.5) * 0.4;
+                agent.lastVal = Math.max(-1, Math.min(1, agent.lastVal));
+
+                const op = { agentId: agent.id, value: agent.lastVal, time: state.tick };
+                state.latestOps[agent.id] = op;
+            }
+
+            function drawPhasor() {
+                const center = { x: pCanvas.width / 2, y: pCanvas.height / 2 };
+                const radius = pCanvas.width / 2 - 20;
+                pCtx.clearRect(0, 0, pCanvas.width, pCanvas.height);
+                
+                pCtx.strokeStyle = '#e2e8f0'; pCtx.lineWidth = 1;
+                pCtx.beginPath(); pCtx.arc(center.x, center.y, radius, 0, 2 * Math.PI); pCtx.stroke();
+
+                let totalVec = { re: 0, im: 0 };
+                const opsToDraw = Object.values(state.latestOps);
+
+                opsToDraw.forEach(op => {
+                    const agent = state.agents[op.agentId];
+                    const angle = op.time * state.theta;
+                    const vec = { re: op.value * Math.cos(angle), im: op.value * Math.sin(angle) };
+                    totalVec.re += vec.re;
+                    totalVec.im += vec.im;
+                    
+                    pCtx.beginPath(); pCtx.moveTo(center.x, center.y);
+                    const endX = center.x + vec.re * radius;
+                    const endY = center.y - vec.im * radius;
+                    pCtx.lineTo(endX, endY);
+                    pCtx.strokeStyle = agent.color; pCtx.lineWidth = 2;
+                    pCtx.stroke();
+                });
+                
+                if (opsToDraw.length > 0) {
+                    pCtx.beginPath(); pCtx.moveTo(center.x, center.y);
+                    const displayScale = radius / state.numAgents;
+                    const endX = center.x + totalVec.re * displayScale;
+                    const endY = center.y - totalVec.im * displayScale;
+                    pCtx.lineTo(endX, endY);
+                    pCtx.strokeStyle = '#7c3aed'; pCtx.lineWidth = 4;
+                    pCtx.stroke();
+                }
+            }
+
+            function drawWave() {
+                const w = wCanvas.width, h = wCanvas.height;
+                const midY = h / 2;
+                const amp = h / 3;
+                wCtx.clearRect(0, 0, w, h);
+                wCtx.strokeStyle = '#e2e8f0'; wCtx.lineWidth = 1;
+                wCtx.beginPath(); wCtx.moveTo(0, midY); wCtx.lineTo(w, midY); wCtx.stroke();
+
+                const opsToDraw = Object.values(state.latestOps);
+                if (opsToDraw.length === 0) return;
+
+                let totalWave = new Array(w).fill(0);
+                opsToDraw.forEach(op => {
+                    const agent = state.agents[op.agentId];
+                    wCtx.beginPath(); wCtx.moveTo(0, midY);
+                    for(let x=0; x<w; x++) {
+                        const waveVal = op.value * Math.sin(x * 0.1 + op.time * state.theta);
+                        totalWave[x] += waveVal;
+                        wCtx.lineTo(x, midY - waveVal * (amp / 2));
+                    }
+                    wCtx.strokeStyle = agent.color; wCtx.globalAlpha = 0.4; wCtx.lineWidth = 1.5;
+                    wCtx.stroke();
+                });
+                wCtx.globalAlpha = 1.0;
+                
+                wCtx.beginPath(); wCtx.moveTo(0, midY);
+                for(let x=0; x<w; x++) {
+                    wCtx.lineTo(x, midY - (totalWave[x] / state.numAgents) * amp);
+                }
+                wCtx.strokeStyle = '#7c3aed'; wCtx.lineWidth = 3;
+                wCtx.stroke();
+            }
+
+            function gameLoop(timestamp) {
+                animationFrameId = requestAnimationFrame(gameLoop);
+                if(state.isRunning && timestamp - state.lastOpTime > state.speed) {
+                    state.tick++;
+                    addOperation();
+                    state.lastOpTime = timestamp;
+                    tickDisplay.textContent = `Tick: ${state.tick}`;
+                }
+                drawPhasor();
+                drawWave();
+            }
+            
+            if (animationFrameId) cancelAnimationFrame(animationFrameId);
+            reset();
+            gameLoop(performance.now());
+        }
+
+        switchStep('4'); // Start on step 4 to show the newly populated content
+    });
+    </script>
+</body>
+</html>
