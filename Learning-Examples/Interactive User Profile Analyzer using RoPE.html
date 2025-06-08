@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive User Profile Analyzer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .profile-card {
+            transition: all 0.3s ease-in-out;
+            transform: translateY(20px);
+            opacity: 0;
+        }
+        .profile-card.visible {
+            transform: translateY(0);
+            opacity: 1;
+        }
+        .spinner {
+            border-top-color: #3498db;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .tab-btn.active {
+            border-bottom-color: #3b82f6;
+            color: #3b82f6;
+        }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800">
+
+    <div class="container mx-auto p-4 md:p-8">
+        
+        <header class="text-center mb-8">
+            <h1 class="text-3xl md:text-4xl font-bold text-slate-900">Interactive User Profile Analyzer</h1>
+            <p class="mt-2 text-slate-600 max-w-3xl mx-auto">A tutorial and tool for creating a user profile from text using an AI model. Use the tabs below to explore the tool and the concepts behind it.</p>
+        </header>
+
+        <!-- Tabs -->
+        <div class="mb-8 border-b border-slate-200">
+            <nav class="flex -mb-px space-x-6 overflow-x-auto" aria-label="Tabs">
+                <button class="tab-btn active whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm" data-tab="analyzer">Analyzer Tool</button>
+                <button class="tab-btn whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300" data-tab="how-it-works">How It Works</button>
+                <button class="tab-btn whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300" data-tab="rope-math">RoPE & Transformers</button>
+                <button class="tab-btn whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300" data-tab="context-map">Contextual Mapping</button>
+            </nav>
+        </div>
+
+        <!-- Analyzer Tab Content -->
+        <div id="analyzer" class="tab-content active">
+            <!-- Model Configuration -->
+            <div class="bg-white p-6 rounded-xl shadow-md mb-8">
+                <h2 class="text-xl font-semibold mb-4 text-slate-900">Model Configuration</h2>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label for="providerSelect" class="block text-sm font-medium text-slate-700">LLM Provider</label>
+                        <select id="providerSelect" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-slate-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md">
+                            <option value="gemini">Google Gemini (Default)</option>
+                            <option value="openai">OpenAI</option>
+                            <option value="custom">Custom Endpoint</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="apiKeyInput" class="block text-sm font-medium text-slate-700">API Key</label>
+                        <input type="password" id="apiKeyInput" class="mt-1 block w-full border border-slate-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 transition-colors disabled:bg-slate-100 disabled:cursor-not-allowed" placeholder="Enter your API Key">
+                    </div>
+                    <div>
+                        <label for="modelInput" class="block text-sm font-medium text-slate-700">Model Name / Endpoint URL</label>
+                        <input type="text" id="modelInput" class="mt-1 block w-full border border-slate-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                </div>
+                <div id="gemini-options" class="mt-4 hidden">
+                    <label class="flex items-center">
+                        <input type="checkbox" id="useOwnGeminiKey" class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                        <span class="ml-2 text-sm text-slate-700">Use my own Gemini API Key</span>
+                    </label>
+                </div>
+                <p id="model-helper-text" class="text-xs text-slate-500 mt-2"></p>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <!-- Input Column -->
+                <div class="bg-white p-6 rounded-xl shadow-md">
+                    <h2 class="text-xl font-semibold mb-4 text-slate-900">1. Input User Text</h2>
+                    <p class="text-sm text-slate-500 mb-4">Paste a collection of a user's posts, comments, or other writings into the box below. More text provides a more accurate analysis.</p>
+                    <textarea id="userInput" class="w-full h-80 p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition" placeholder="Example: 
+'Just finished setting up my new home server with Proxmox. It was a bit of a challenge, but so rewarding! Now I can run all my dev containers locally. Anyone have tips for optimizing network performance?'
+
+'Spent the weekend gardening. My heirloom tomatoes are finally starting to ripen! There's nothing better than food you've grown yourself. So peaceful.'
+
+'Debating switching my main project from React to Svelte. The performance benchmarks are compelling, but the React ecosystem is just so mature. Tough call.'"></textarea>
+                    <button id="analyzeBtn" class="mt-4 w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-transform transform hover:scale-102 flex items-center justify-center">
+                        <span id="btnText">Analyze & Build Profile</span>
+                        <div id="spinner" class="spinner w-5 h-5 rounded-full border-2 border-t-transparent border-white ml-3 hidden"></div>
+                    </button>
+                </div>
+
+                <!-- Output Column -->
+                <div class="bg-white p-6 rounded-xl shadow-md">
+                    <h2 class="text-xl font-semibold mb-4 text-slate-900">2. Generated AI Profile</h2>
+                    <div id="profileOutput" class="space-y-4">
+                        <div id="placeholder" class="text-center py-16 text-slate-500">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="mx-auto h-12 w-12 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                            <p class="mt-4 font-medium">Your generated profile will appear here.</p>
+                        </div>
+                        <div id="profileContent" class="hidden">
+                             <div id="error-box" class="hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg relative" role="alert">
+                                <strong class="font-bold">Error:</strong>
+                                <span class="block sm:inline" id="error-message"></span>
+                            </div>
+                            <div id="summaryCard" class="profile-card"></div>
+                            <div id="interestsCard" class="profile-card"></div>
+                            <div id="personalityCard" class="profile-card"></div>
+                            <div id="topicsCard" class="profile-card"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- How It Works Tab Content -->
+        <div id="how-it-works" class="tab-content bg-white p-6 md:p-8 rounded-xl shadow-md"></div>
+        
+        <!-- RoPE Tab Content -->
+        <div id="rope-math" class="tab-content bg-white p-6 md:p-8 rounded-xl shadow-md"></div>
+        
+        <!-- Contextual Mapping Tab -->
+        <div id="context-map" class="tab-content bg-white p-6 md:p-8 rounded-xl shadow-md">
+             <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div>
+                    <h2 class="text-2xl font-bold text-slate-900 mb-2">Contextual Data Mapping</h2>
+                    <p id="context-map-placeholder" class="text-slate-600 mb-4">Generate a profile first. This view will break down the profile into its core components, showing how each piece of data contributes to a weighted, structured representation.</p>
+                    <div id="context-map-content" class="space-y-4"></div>
+                </div>
+                <div class="prose max-w-none">
+                    <h3 class="text-xl font-semibold text-slate-800">Compressing Context with Quaternions</h3>
+                    <p>This mapping demonstrates a novel concept: using rotations to encode weighted, multi-faceted contextual information, not just linear position.</p>
+                    
+                    <h4 class="font-semibold text-slate-800">1. Assigning Contextual Weights</h4>
+                    <p>First, we assign a numerical weight \(w_k\) to each contextual area \(k\). As you can see in the mapping on the left, this weight is a simple heuristic based on the number of items (the 'Contributing Variables') found for that area in the profile.</p>
+                    
+                    <h4 class="font-semibold text-slate-800">2. From Weight to Quaternion Rotation</h4>
+                    <p>We use quaternions to represent 3D rotations. A quaternion can be defined by a rotation axis (a 3D vector \(\vec{u}\)) and a rotation angle (\(\alpha\)). Each contextual area is assigned a unique, fixed axis, also shown in the mapping.</p>
+                    <p>The angle of rotation \(\alpha_k\) for each area is determined by its weight: \(\alpha_k = w_k \cdot \theta\), where \(\theta\) is a base scaling factor. The corresponding quaternion \(q_k\) is then:</p>
+                    <p>$$ q_k = \cos(\alpha_k/2) + (u_x i + u_y j + u_z k)\sin(\alpha_k/2) $$</p>
+
+                    <h4 class="font-semibold text-slate-800">3. Compressing Context via Multiplication</h4>
+                    <p>The power of quaternions is that multiple rotations can be combined into a single, final rotation by multiplying them together. This is how we "compress" all the contextual data from the profile:</p>
+                    <p>$$ q_{\text{final}} = q_{\text{topics}} \cdot q_{\text{personality}} \cdot q_{\text{interests}} $$</p>
+                    <p>This ordered multiplication creates a single, final quaternion \(q_{\text{final}}\) that encodes the influence of all contextual areas. This demonstrates how a complex set of weighted, semantic data can be efficiently encoded into a single rotational operation, a key principle for advanced embedding techniques.</p>
+                </div>
+            </div>
+        </div>
+        
+        <footer class="text-center mt-12 text-sm text-slate-500">
+            <p>This tool demonstrates AI-driven text analysis for user profiling. It does not store any input data.</p>
+        </footer>
+    </div>
+
+    <script type="module">
+        // --- Tab Switching Logic ---
+        const tabs = document.querySelectorAll('.tab-btn');
+        const tabContents = document.querySelectorAll('.tab-content');
+        tabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                const targetId = tab.dataset.tab;
+                const target = document.getElementById(targetId);
+                tabs.forEach(t => t.classList.remove('active', 'text-blue-600'));
+                tabContents.forEach(tc => tc.classList.remove('active'));
+                tab.classList.add('active', 'text-blue-600');
+                target.classList.add('active');
+                if ((targetId === 'how-it-works' || targetId === 'rope-math' || targetId === 'context-map') && window.MathJax) {
+                    window.MathJax.typeset();
+                }
+            });
+        });
+        
+        // --- Fill static tab content ---
+        document.getElementById('how-it-works').innerHTML = `<div class="prose max-w-none"><h2 class="text-2xl font-bold text-slate-900">The Concepts Behind the Analysis</h2><p class="text-slate-600">This AI model doesn't "understand" text like a human. Instead, it uses sophisticated mathematical techniques to find patterns, relationships, and structures within the data. Here's a simplified look at the core concepts.</p><hr class="my-6"><h3 class="text-xl font-semibold text-slate-800">1. Text Vectorization (Embeddings)</h3><p>The first step is to convert words into numbers that a machine can process. This is called vectorization or creating 'embeddings'.</p><p>\( \\text{vector}(\\text{"King"}) - \\text{vector}(\\text{"Man"}) + \\text{vector}(\\text{"Woman"}) \\approx \\text{vector}(\\text{"Queen"}) \)</p><hr class="my-6"><h3 class="text-xl font-semibold text-slate-800">2. Topic Modeling</h3><p>To find 'Inferred Interests', the model performs topic modeling. It assumes that the text is a mixture of several underlying topics.</p><p>$$ P(w) = \\sum_{j=1}^{T} P(w|z_j) P(z_j) $$</p><hr class="my-6"><h3 class="text-xl font-semibold text-slate-800">3. The Transformer Architecture & Attention</h3><p>Modern LLMs are built on an architecture called the "Transformer". Its key innovation is the **self-attention mechanism**.</p><p>$$ \\text{Attention}(Q, K, V) = \\text{softmax}\\left(\\frac{QK^T}{\\sqrt{d_k}}\\right)V $$</p></div>`;
+        document.getElementById('rope-math').innerHTML = `<div class="prose max-w-none"><h2 class="text-2xl font-bold text-slate-900">Advanced Topic: Rotary Positional Embeddings (RoPE)</h2><p class="text-slate-600">RoPE encodes position by *rotating* the vectors, which has significant benefits for performance and efficiency.</p><hr class="my-6"><h3 class="text-xl font-semibold text-slate-800">1. The Core Idea: Position as Rotation</h3><p>RoPE's goal is to make the similarity calculation inherently dependent on the tokens' relative distance.</p><p>$$ f(x,m) = x \\cdot e^{im\\theta} $$</p><hr class="my-6"><h3 class="text-xl font-semibold text-slate-800">2. RoPE's Impact on Attention</h3><p>The dot product between two rotated vectors only depends on the **relative rotation** between them.</p><p>$$ \\langle q_m, R_{n-m} k_n \\rangle $$</p><hr class="my-6"><h3 class="text-xl font-semibold text-slate-800">3. Benefits: Power and Compression</h3><p>This rotational approach provides several key advantages, including improved performance, sequence length extrapolation, and a more efficient use of model dimensions.</p></div>`;
+
+
+        // --- DOM Element References ---
+        const providerSelect = document.getElementById('providerSelect');
+        const apiKeyInput = document.getElementById('apiKeyInput');
+        const modelInput = document.getElementById('modelInput');
+        const modelHelperText = document.getElementById('model-helper-text');
+        const userInput = document.getElementById('userInput');
+        const analyzeBtn = document.getElementById('analyzeBtn');
+        const btnText = document.getElementById('btnText');
+        const spinner = document.getElementById('spinner');
+        const profileOutput = document.getElementById('profileOutput');
+        const placeholder = document.getElementById('placeholder');
+        const profileContent = document.getElementById('profileContent');
+        const errorBox = document.getElementById('error-box');
+        const errorMessage = document.getElementById('error-message');
+        const geminiOptionsDiv = document.getElementById('gemini-options');
+        const useOwnGeminiKeyCheckbox = document.getElementById('useOwnGeminiKey');
+        
+        const contextMapPlaceholder = document.getElementById('context-map-placeholder');
+        const contextMapContent = document.getElementById('context-map-content');
+
+        // --- Model Configuration Logic ---
+        const providerConfigs = {
+            gemini: { model: 'gemini-2.0-flash', helper: 'Using default environment key. Check the box to use your own.' },
+            openai: { model: 'gpt-4o', helper: 'For OpenAI, your API key is required.' },
+            custom: { model: 'http://localhost:11434/api/chat', helper: 'Enter the full API endpoint URL and your key if required.' }
+        };
+
+        function updateModelConfigUI() {
+            const provider = providerSelect.value;
+            modelInput.value = providerConfigs[provider].model;
+            modelHelperText.textContent = providerConfigs[provider].helper;
+
+            if (provider === 'gemini') {
+                geminiOptionsDiv.classList.remove('hidden');
+                apiKeyInput.disabled = !useOwnGeminiKeyCheckbox.checked;
+                if (!useOwnGeminiKeyCheckbox.checked) {
+                    apiKeyInput.value = '';
+                }
+            } else {
+                geminiOptionsDiv.classList.add('hidden');
+                apiKeyInput.disabled = false;
+            }
+            apiKeyInput.placeholder = apiKeyInput.disabled ? "Using default key" : "Enter your API key";
+        }
+
+        providerSelect.addEventListener('change', updateModelConfigUI);
+        useOwnGeminiKeyCheckbox.addEventListener('change', updateModelConfigUI);
+        updateModelConfigUI(); // Initialize
+
+        // --- Core Application Logic ---
+        
+        const profileSchema = {
+            type: "OBJECT",
+            properties: {
+                summary: { type: "STRING" },
+                inferred_interests: { type: "ARRAY", items: { type: "STRING" } },
+                personality_traits: {
+                    type: "OBJECT",
+                    properties: {
+                        dominant_emotion: { type: "STRING" },
+                        communication_style: { type: "ARRAY", items: { type: "STRING" } },
+                        social_role: { type: "STRING" }
+                    }
+                },
+                key_topics: { type: "ARRAY", items: { type: "STRING" } }
+            }
+        };
+
+        const promptTemplate = `You are an expert psychological and behavioral analyst. Your response MUST be a valid JSON object based on the user's text. Schema: {"summary": "...", "inferred_interests": [], "personality_traits": {"dominant_emotion": "...", "communication_style": [], "social_role": "..."}, "key_topics": []}. Here is the user's text:\n---\n{TEXT_INPUT}\n---`;
+
+        analyzeBtn.addEventListener('click', analyzeText);
+
+        async function analyzeText() {
+            const text = userInput.value;
+            const provider = providerSelect.value;
+            let apiKey = apiKeyInput.value;
+            const model = modelInput.value;
+
+            if (text.trim().length < 50) {
+                showError("Please enter more text (at least 50 characters).");
+                return;
+            }
+
+            if (provider !== 'gemini' && !apiKey) {
+                showError("API Key is required for the selected provider.");
+                apiKeyInput.classList.add('border-red-500', 'ring-1', 'ring-red-500');
+                return;
+            }
+            
+            if (provider === 'gemini' && !useOwnGeminiKeyCheckbox.checked) {
+                apiKey = ""; 
+            }
+
+            setLoadingState(true);
+
+            try {
+                const finalPrompt = promptTemplate.replace('{TEXT_INPUT}', text);
+                let requestConfig;
+
+                if (provider === 'gemini') {
+                    requestConfig = buildGeminiRequest(finalPrompt, model, apiKey);
+                } else {
+                    requestConfig = buildOpenAIRequest(finalPrompt, model, apiKey);
+                }
+                
+                const response = await fetch(requestConfig.url, requestConfig.options);
+
+                if (!response.ok) {
+                    if (response.status === 401) {
+                         throw new Error(`Authentication Error (401): Unauthorized. Please ensure your API Key is correct, valid, and has the required permissions for the selected model.`);
+                    }
+                    const errorBody = await response.text();
+                    throw new Error(`API Error: ${response.status} ${response.statusText}. Response: ${errorBody}`);
+                }
+                
+                const result = await response.json();
+                const profileData = parseApiResponse(provider, result);
+
+                displayProfile(profileData);
+                renderContextualMapping(profileData);
+
+            } catch (error)
+             {
+                console.error('Analysis failed:', error);
+                showError(error.message || "An unknown error occurred.");
+                if (error.message.includes("Authentication Error (401)")) {
+                    apiKeyInput.classList.add('border-red-500', 'ring-1', 'ring-red-500');
+                }
+            } finally {
+                setLoadingState(false);
+            }
+        }
+
+        // --- API Request Builders and Parsers ---
+        function buildGeminiRequest(prompt, model, apiKey) {
+            return {
+                url: `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+                options: { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: prompt }] }], generationConfig: { responseMimeType: "application/json", responseSchema: profileSchema } }) }
+            };
+        }
+
+        function buildOpenAIRequest(prompt, modelOrUrl, apiKey) {
+            const isCustomUrl = modelOrUrl.startsWith('http');
+            const url = isCustomUrl ? modelOrUrl : 'https://api.openai.com/v1/chat/completions';
+            const modelName = isCustomUrl ? 'custom' : modelOrUrl;
+            return {
+                url: url,
+                options: { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` }, body: JSON.stringify({ model: modelName, messages: [{ role: "user", content: prompt }], response_format: { type: "json_object" } }) }
+            };
+        }
+
+        function cleanAndParseJson(rawText) {
+            try {
+                return JSON.parse(rawText);
+            } catch (e) {
+                console.warn("Direct JSON.parse failed, attempting to clean response text.");
+                const match = rawText.match(/\{[\s\S]*\}/);
+                if (match) {
+                    try {
+                        return JSON.parse(match[0]);
+                    } catch (finalError) {
+                         throw new Error(`Failed to parse JSON even after cleaning. Error: ${finalError.message}`);
+                    }
+                }
+                throw new Error("Could not find a valid JSON object in the model's response.");
+            }
+        }
+
+        function parseApiResponse(provider, result) {
+            let rawText;
+            if (provider === 'gemini') {
+                 if (result.candidates && result.candidates[0].content && result.candidates[0].content.parts[0]) {
+                    rawText = result.candidates[0].content.parts[0].text;
+                 } else {
+                    throw new Error('Could not parse Gemini response: No valid candidate found.');
+                 }
+            } else { // OpenAI and Custom
+                if (result.choices && result.choices[0].message && result.choices[0].message.content) {
+                    rawText = result.choices[0].message.content;
+                } else {
+                    throw new Error('Could not parse OpenAI-compatible response: No valid choice found.');
+                }
+            }
+            return cleanAndParseJson(rawText);
+        }
+        
+        // --- UI Display Functions ---
+        function displayProfile(profile) {
+            placeholder.classList.add('hidden');
+            clearPreviousProfile();
+            const createCard = (title, icon, content) => `<div class="p-4 bg-slate-50 rounded-lg border border-slate-200"><h3 class="font-semibold text-lg mb-2 flex items-center text-slate-800">${icon}<span class="ml-2">${title}</span></h3><div class="text-slate-600">${content}</div></div>`;
+            const createListContent = (items) => items && items.length ? `<div class="flex flex-wrap gap-2">${items.map(item => `<span class="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-1 rounded-full">${item}</span>`).join('')}</div>` : '<p>N/A</p>';
+            const summaryIcon = '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-blue-600"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>';
+            const interestsIcon = '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-green-600"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>';
+            const personalityIcon = '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-purple-600"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>';
+            const topicsIcon = '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-yellow-600"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>';
+            document.getElementById('summaryCard').innerHTML = createCard('Persona Summary', summaryIcon, `<p>${profile.summary || 'N/A'}</p>`);
+            document.getElementById('interestsCard').innerHTML = createCard('Inferred Interests', interestsIcon, createListContent(profile.inferred_interests));
+            const p = profile.personality_traits || {};
+            const personalityContent = `<div class="space-y-2"><div><strong>Dominant Emotion:</strong> <span class="font-normal">${p.dominant_emotion || 'N/A'}</span></div><div><strong>Social Role:</strong> <span class="font-normal">${p.social_role || 'N/A'}</span></div><div><strong>Communication Style:</strong> ${createListContent(p.communication_style)}</div></div>`;
+            document.getElementById('personalityCard').innerHTML = createCard('Personality & Style', personalityIcon, personalityContent);
+            document.getElementById('topicsCard').innerHTML = createCard('Key Topics & Keywords', topicsIcon, createListContent(profile.key_topics));
+            profileContent.classList.remove('hidden');
+            document.querySelectorAll('.profile-card').forEach((card, index) => setTimeout(() => card.classList.add('visible'), index * 100));
+        }
+
+        // --- Contextual Mapping Function ---
+        function renderContextualMapping(profile) {
+            contextMapPlaceholder.style.display = 'none';
+            contextMapContent.innerHTML = ''; // Clear previous content
+
+            const interests = profile.inferred_interests || [];
+            const personality = profile.personality_traits ? Object.values(profile.personality_traits).flat().filter(Boolean) : [];
+            const topics = profile.key_topics || [];
+
+            const areas = [
+                { name: 'Inferred Interests', axis: 'X-axis (1,0,0)', color: 'green', variables: interests, weight: interests.length },
+                { name: 'Personality & Style', axis: 'Y-axis (0,1,0)', color: 'purple', variables: personality, weight: personality.length },
+                { name: 'Key Topics & Keywords', axis: 'Z-axis (0,0,1)', color: 'yellow', variables: topics, weight: topics.length },
+            ];
+
+            areas.forEach(area => {
+                const card = document.createElement('div');
+                card.className = `bg-white border-l-4 border-${area.color}-500 p-4 rounded-lg shadow`;
+
+                const variablesHtml = area.variables.length > 0
+                    ? area.variables.map(v => `<span class="bg-gray-200 text-gray-800 text-xs font-medium mr-2 mb-2 px-2.5 py-1 rounded-full">${v}</span>`).join('')
+                    : '<span class="text-gray-500">None detected</span>';
+
+                card.innerHTML = `
+                    <h4 class="text-lg font-bold text-gray-800">${area.name}</h4>
+                    <div class="mt-2">
+                        <p class="text-sm"><strong class="font-semibold">Assigned Axis:</strong> <code class="bg-gray-100 p-1 rounded">${area.axis}</code></p>
+                        <p class="text-sm"><strong class="font-semibold">Calculated Weight:</strong> ${area.weight}</p>
+                    </div>
+                    <div class="mt-3">
+                        <p class="text-sm font-semibold mb-2">Contributing Variables:</p>
+                        <div class="flex flex-wrap">${variablesHtml}</div>
+                    </div>
+                `;
+                contextMapContent.appendChild(card);
+            });
+             if (window.MathJax) {
+                window.MathJax.typeset();
+             }
+        }
+
+
+        // --- Other UI Helpers ---
+        function clearPreviousProfile() {
+            document.querySelectorAll('.profile-card').forEach(c => { c.innerHTML = ''; c.classList.remove('visible'); });
+            errorBox.classList.add('hidden');
+            contextMapPlaceholder.style.display = 'block';
+            contextMapContent.innerHTML = '';
+        }
+        function setLoadingState(isLoading) {
+            analyzeBtn.disabled = isLoading;
+            btnText.textContent = isLoading ? 'Analyzing...' : 'Analyze & Build Profile';
+            spinner.classList.toggle('hidden', !isLoading);
+            if (isLoading) {
+                apiKeyInput.classList.remove('border-red-500', 'ring-1', 'ring-red-500'); // Reset highlight on new attempt
+                placeholder.classList.add('hidden');
+                profileContent.classList.add('hidden');
+                clearPreviousProfile();
+            }
+        }
+        function showError(message) {
+            placeholder.classList.add('hidden');
+            profileContent.classList.remove('hidden');
+            errorMessage.textContent = message;
+            errorBox.classList.remove('hidden');
+        }
+
+    </script>
+</body>
+</html>
