@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Guide to A2A - Part 8: 21-Agent Network Orchestration</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f4f8; /* A slightly cooler gray */
+        }
+        .card {
+            background-color: white;
+            border-radius: 0.75rem;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            padding: 1rem;
+            margin-bottom: 1.5rem;
+            transition: all 0.3s ease-in-out;
+        }
+        .agent {
+            padding: 0.75rem;
+            border-radius: 0.5rem;
+            transition: all 0.3s ease-in-out;
+            border: 2px solid transparent;
+        }
+        .agent.state-idle { border-color: #e5e7eb; }
+        .agent.state-busy { border-color: #f59e0b; background-color: #fefce8; }
+        .agent.state-done { border-color: #22c55e; background-color: #f0fdf4; }
+
+        .log-view {
+            font-family: monospace;
+            font-size: 0.75rem;
+            color: #475569;
+            margin-top: 0.5rem;
+            white-space: pre-wrap;
+            background-color: #f8fafc;
+            padding: 0.5rem;
+            border-radius: 0.25rem;
+            border: 1px solid #e2e8f0;
+        }
+        #arrow-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 10;
+        }
+    </style>
+</head>
+<body class="text-slate-800 p-4 md:p-8">
+
+    <div class="max-w-screen-2xl mx-auto">
+        <header class="text-center mb-10">
+            <h1 class="text-4xl font-bold text-blue-600">21-Agent Network Orchestration</h1>
+            <p class="mt-2 text-lg text-slate-600">Part 8: Simulating a complex market analysis report generation.</p>
+        </header>
+
+        <!-- Command Center -->
+        <div class="card max-w-4xl mx-auto">
+             <div id="orchestrator" class="agent state-idle">
+                <h3 class="font-bold text-lg text-blue-700 text-center">🤖 Orchestrator Agent</h3>
+                <div class="log-view" id="log-orchestrator">Idle. Click button to start.</div>
+             </div>
+             <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 text-center font-mono">
+                <div class="bg-slate-100 p-3 rounded-lg">
+                    <div class="text-xs text-slate-500">Total Data Transmitted</div>
+                    <div id="total-data" class="text-xl font-bold text-blue-600">0 KB</div>
+                </div>
+                <div class="bg-slate-100 p-3 rounded-lg">
+                    <div class="text-xs text-slate-500">Total Network Time</div>
+                    <div id="total-time" class="text-xl font-bold text-blue-600">0.00 ms</div>
+                </div>
+             </div>
+             <button id="start-simulation-btn" class="mt-4 w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition-transform duration-200 hover:scale-105">
+                Generate Market Analysis Report
+            </button>
+        </div>
+        
+        <!-- Agent Network -->
+        <div class="relative">
+            <canvas id="arrow-canvas"></canvas>
+            <div id="agent-network" class="mt-8 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-4">
+                <!-- Worker agents will be injected here by JS -->
+            </div>
+        </div>
+    </div>
+
+<script>
+    const startBtn = document.getElementById('start-simulation-btn');
+    const agentNetworkGrid = document.getElementById('agent-network');
+    const orchestratorLog = document.getElementById('log-orchestrator');
+    const orchestratorAgentEl = document.getElementById('orchestrator');
+    const totalDataEl = document.getElementById('total-data');
+    const totalTimeEl = document.getElementById('total-time');
+    const canvas = document.getElementById('arrow-canvas');
+    const ctx = canvas.getContext('2d');
+
+    const AGENT_CONFIG = {
+        total: 20,
+        roles: {
+            'Data Fetcher': { count: 8, icon: '📡', reqSize: 100, resSize: 150 * 1024 }, // 150KB
+            'Data Analyst': { count: 6, icon: '📊', reqSize: 150 * 1024, resSize: 20 * 1024 }, // 20KB
+            'Summarizer': { count: 5, icon: '✍️', reqSize: 20 * 1024, resSize: 5 * 1024 },  // 5KB
+            'Report Compiler': { count: 1, icon: '📄', reqSize: 5 * 1024 * 5, resSize: 2 * 1024 * 1024 } // 2MB
+        },
+        networkSpeedMbps: 100 // Simulate 100 Mbps network
+    };
+    
+    let agents = [];
+    let totalDataTransmitted = 0;
+    let totalNetworkTime = 0;
+
+    // --- Agent & UI Setup ---
+    function formatBytes(bytes) {
+        if (bytes < 1024) return `${bytes} B`;
+        if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+        return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+    }
+
+    function setupAgents() {
+        agentNetworkGrid.innerHTML = '';
+        agents = [];
+        let agentId = 0;
+        for (const role in AGENT_CONFIG.roles) {
+            const config = AGENT_CONFIG.roles[role];
+            for (let i = 0; i < config.count; i++) {
+                const id = `agent-${agentId}`;
+                const el = document.createElement('div');
+                el.id = id;
+                el.className = 'agent state-idle';
+                el.innerHTML = `<h4 class="font-semibold text-sm">${config.icon} ${role} #${i+1}</h4><div class="log-view" id="log-${id}">Idle</div>`;
+                agentNetworkGrid.appendChild(el);
+                agents.push({ id, role, el });
+                agentId++;
+            }
+        }
+        // Resize canvas to fit grid
+        setTimeout(() => {
+            const gridRect = agentNetworkGrid.getBoundingClientRect();
+            canvas.width = gridRect.width;
+            canvas.height = gridRect.height;
+            canvas.style.top = `${agentNetworkGrid.offsetTop}px`;
+            canvas.style.left = `${agentNetworkGrid.offsetLeft}px`;
+        }, 100);
+    }
+
+    function setAgentState(agentId, state, message = 'Idle') {
+        const agentEl = document.getElementById(agentId);
+        const logEl = document.getElementById(`log-${agentId}`);
+        if (!agentEl || !logEl) return;
+        agentEl.className = `agent state-${state}`;
+        logEl.textContent = message;
+    }
+    
+    const delay = (ms) => new Promise(res => setTimeout(res, ms));
+
+    // --- Arrow Drawing ---
+    function drawArrow(fromEl, toEl, color) {
+        const fromRect = fromEl.getBoundingClientRect();
+        const toRect = toEl.getBoundingClientRect();
+        const canvasRect = canvas.getBoundingClientRect();
+
+        const startX = fromRect.left + fromRect.width / 2 - canvasRect.left;
+        let startY = fromRect.bottom - canvasRect.top;
+        if (fromEl.id === 'orchestrator') { // Orchestrator is above the grid
+           startY = fromRect.bottom - canvasRect.top - 10;
+        } else { // Agents inside the grid
+           startY = fromRect.top + fromRect.height / 2 - canvasRect.top;
+        }
+
+        const endX = toRect.left + toRect.width / 2 - canvasRect.left;
+        let endY = toRect.top - canvasRect.top;
+         if (toEl.id === 'orchestrator') {
+           endY = toRect.top - canvasRect.top + 10;
+        } else {
+           endY = toRect.top - canvasRect.top;
+        }
+
+
+        ctx.beginPath();
+        ctx.moveTo(startX, startY);
+        // Using a quadratic curve for a more organic look
+        ctx.quadraticCurveTo(startX, startY + 60, endX, endY);
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([4, 4]); // Dashed line for requests
+        ctx.stroke();
+    }
+    
+    async function showCommunication(fromEl, toAgents, color, isResponse = false) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height); // Clear for new batch
+        if (isResponse) {
+             toAgents.forEach(agent => drawArrow(agent.el, fromEl, color));
+        } else {
+             toAgents.forEach(agent => drawArrow(fromEl, agent.el, color));
+        }
+       
+        await delay(500); // Let arrows be visible
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+    
+    function calculateNetworkTime(bytes) {
+        const speedBps = (AGENT_CONFIG.networkSpeedMbps * 1000 * 1000) / 8;
+        return (bytes / speedBps) * 1000; // time in ms
+    }
+
+    // --- Simulation Logic ---
+    async function runPhase(phaseName, targetRole, sourcePayloadSize, requestColor, responseColor) {
+        orchestratorLog.textContent = `Phase: ${phaseName}...`;
+        
+        const workers = agents.filter(a => a.role === targetRole);
+        const roleConfig = AGENT_CONFIG.roles[targetRole];
+        
+        // Send requests
+        let totalRequestData = 0;
+        workers.forEach((worker, i) => {
+            let reqSize = sourcePayloadSize ? sourcePayloadSize : roleConfig.reqSize;
+            totalRequestData += reqSize;
+            setAgentState(worker.id, 'busy', `IN: ${formatBytes(reqSize)}`);
+        });
+        
+        totalDataTransmitted += totalRequestData;
+        let requestTime = calculateNetworkTime(totalRequestData);
+        totalNetworkTime += requestTime;
+        totalDataEl.textContent = formatBytes(totalDataTransmitted);
+        totalTimeEl.textContent = `${totalNetworkTime.toFixed(2)} ms`;
+        await showCommunication(orchestratorAgentEl, workers, requestColor);
+        await delay(requestTime);
+        
+        orchestratorLog.textContent = `Phase: ${phaseName} - Waiting for processing...`;
+        await delay(1500); // Simulate processing time
+        
+        // Receive responses
+        let totalResponseData = 0;
+        workers.forEach(worker => {
+            totalResponseData += roleConfig.resSize;
+            setAgentState(worker.id, 'done', `OUT: ${formatBytes(roleConfig.resSize)}`);
+        });
+
+        totalDataTransmitted += totalResponseData;
+        let responseTime = calculateNetworkTime(totalResponseData);
+        totalNetworkTime += responseTime;
+        totalDataEl.textContent = formatBytes(totalDataTransmitted);
+        totalTimeEl.textContent = `${totalNetworkTime.toFixed(2)} ms`;
+        await showCommunication(orchestratorAgentEl, workers, responseColor, true);
+        await delay(responseTime);
+        
+        orchestratorLog.textContent = `Phase: ${phaseName} Complete.`;
+        await delay(500);
+        return { workers, totalResponseData };
+    }
+
+    startBtn.addEventListener('click', async () => {
+        startBtn.disabled = true;
+        startBtn.textContent = 'Orchestrating...';
+        
+        // Reset all states
+        totalDataTransmitted = 0;
+        totalNetworkTime = 0;
+        totalDataEl.textContent = '0 KB';
+        totalTimeEl.textContent = '0.00 ms';
+        setAgentState('orchestrator', 'busy', 'Initiating workflow...');
+        agents.forEach(agent => setAgentState(agent.id, 'idle'));
+
+        const {totalResponseData: fetchedDataSize} = await runPhase('1. Data Gathering', 'Data Fetcher', null, '#f59e0b', '#a78bfa');
+        const {totalResponseData: analyzedDataSize} = await runPhase('2. Data Analysis', 'Data Analyst', fetchedDataSize / AGENT_CONFIG.roles['Data Fetcher'].count, '#ef4444', '#a78bfa');
+        const {totalResponseData: summarizedDataSize} = await runPhase('3. Summarization', 'Summarizer', analyzedDataSize / AGENT_CONFIG.roles['Data Analyst'].count, '#0ea5e9', '#a78bfa');
+        await runPhase('4. Final Compilation', 'Report Compiler', summarizedDataSize, '#10b981', '#a78bfa');
+
+        setAgentState('orchestrator', 'done', 'Market Analysis Report Generated!');
+        startBtn.disabled = false;
+        startBtn.textContent = 'Generate Market Analysis Report';
+    });
+
+    window.addEventListener('resize', setupAgents);
+    // Initial Setup
+    setupAgents();
+</script>
+</body>
+</html>
