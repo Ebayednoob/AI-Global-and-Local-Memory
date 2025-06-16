@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Guide to A2A - Part 7: Data Density & Transmission Simulator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc;
+        }
+        .card {
+            background-color: white;
+            border-radius: 0.75rem;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            padding: 1.5rem 2rem;
+            margin-bottom: 1.5rem;
+        }
+        .code-block {
+            background-color: #1e293b;
+            color: #e2e8f0;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            font-family: monospace;
+            font-size: 0.8rem;
+            word-break: break-all;
+            height: 250px;
+            overflow-y: auto;
+        }
+        .transmission-bar {
+            transition: width 0.5s ease-out;
+        }
+    </style>
+</head>
+<body class="text-slate-800 p-4 md:p-8">
+
+    <div class="max-w-6xl mx-auto">
+        <header class="text-center mb-10">
+            <h1 class="text-4xl font-bold text-blue-600">Data Density & Transmission Simulator</h1>
+            <p class="mt-2 text-lg text-slate-600">Part 7: Analyzing the performance of different A2A message types.</p>
+        </header>
+
+        <div class="card">
+            <h2 class="text-2xl font-semibold mb-4 text-blue-700">A2A Payload Simulator</h2>
+            <div class="grid lg:grid-cols-2 gap-8">
+                <!-- Controls -->
+                <div class="space-y-6">
+                    <div>
+                        <label for="part-type" class="block font-medium mb-2">1. Choose A2A Part Type:</label>
+                        <select id="part-type" class="w-full p-2 border rounded-md">
+                            <option value="text">TextPart (Simple Message)</option>
+                            <option value="data">DataPart (Structured JSON)</option>
+                            <option value="file">FilePart (Base64 Encoded)</option>
+                        </select>
+                    </div>
+                    
+                    <div id="file-size-control" class="hidden">
+                        <label for="file-size-slider" class="block font-medium mb-2">File Size: <span id="file-size-label" class="font-bold">10 KB</span></label>
+                        <input type="range" id="file-size-slider" min="1" max="1000" value="10" class="w-full">
+                         <p class="text-xs text-slate-500 mt-1">Simulates the original file size before Base64 encoding.</p>
+                    </div>
+                    
+                    <div>
+                        <label for="network-speed" class="block font-medium mb-2">2. Select Network Condition:</label>
+                        <select id="network-speed" class="w-full p-2 border rounded-md">
+                            <option value="10">DSL (10 Mbps)</option>
+                            <option value="100" selected>Cable (100 Mbps)</option>
+                            <option value="1000">Fiber (1 Gbps)</option>
+                        </select>
+                    </div>
+
+                    <div>
+                         <h3 class="font-medium mb-2">Generated A2A JSON Payload:</h3>
+                         <div class="code-block" id="json-payload-view"></div>
+                    </div>
+                </div>
+
+                <!-- Results & Simulation -->
+                <div class="space-y-6">
+                    <div>
+                        <h3 class="font-medium text-lg mb-2">Analysis & Results</h3>
+                        <div class="bg-slate-100 p-4 rounded-lg space-y-3 font-mono text-sm">
+                            <div class="flex justify-between"><span>Payload (JSON) Size:</span> <strong id="payload-size">0 B</strong></div>
+                            <div class="flex justify-between"><span>Total Packet Overhead:</span> <strong id="overhead-size">58 B</strong></div>
+                            <div class="flex justify-between text-base border-t pt-2 mt-2"><span>Total Transmitted Data:</span> <strong id="total-size">0 B</strong></div>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <h3 class="font-medium text-lg mb-2">Data Density (Efficiency)</h3>
+                        <div class="w-full bg-gray-200 rounded-full h-8 relative">
+                            <div id="density-bar" class="bg-green-500 h-8 rounded-full flex items-center justify-center font-bold text-white text-sm" style="width: 0%;">0%</div>
+                        </div>
+                        <p class="text-xs text-slate-500 mt-1">Percentage of transmitted data that is the actual JSON payload.</p>
+                    </div>
+
+                    <div>
+                        <h3 class="font-medium text-lg mb-2">Simulated Transmission Time</h3>
+                        <div class="w-full bg-gray-200 rounded-full h-8">
+                            <div id="transmission-bar" class="transmission-bar bg-blue-500 h-8 rounded-full"></div>
+                        </div>
+                        <p class="text-center font-bold text-lg mt-2" id="transmission-time">0 ms</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+<script>
+    // UI Elements
+    const partTypeSelect = document.getElementById('part-type');
+    const fileSizeControl = document.getElementById('file-size-control');
+    const fileSizeSlider = document.getElementById('file-size-slider');
+    const fileSizeLabel = document.getElementById('file-size-label');
+    const networkSpeedSelect = document.getElementById('network-speed');
+    const jsonPayloadView = document.getElementById('json-payload-view');
+    
+    // Result Elements
+    const payloadSizeEl = document.getElementById('payload-size');
+    const overheadSizeEl = document.getElementById('overhead-size');
+    const totalSizeEl = document.getElementById('total-size');
+    const densityBar = document.getElementById('density-bar');
+    const transmissionBar = document.getElementById('transmission-bar');
+    const transmissionTimeEl = document.getElementById('transmission-time');
+
+    const formatBytes = (bytes) => {
+        if (bytes === 0) return '0 B';
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    };
+    
+    // Core simulation logic
+    function runSimulation() {
+        const partType = partTypeSelect.value;
+        let payloadPart;
+
+        // 1. Generate the payload part based on selection
+        switch(partType) {
+            case 'text':
+                fileSizeControl.classList.add('hidden');
+                payloadPart = { kind: "text", text: "This is a standard text message for a basic A2A interaction." };
+                break;
+            case 'data':
+                fileSizeControl.classList.add('hidden');
+                payloadPart = { kind: "data", data: { transactionId: "xyz-123", user: "jdoe", items: [ {id: 1, qty: 2}, {id: 5, qty: 1}], status: "pending" }};
+                break;
+            case 'file':
+                fileSizeControl.classList.remove('hidden');
+                const fileSizeKB = parseInt(fileSizeSlider.value);
+                fileSizeLabel.textContent = `${fileSizeKB} KB`;
+                // Base64 encoding adds ~33% overhead to the original file size
+                const base64Overhead = 1.333;
+                // Generate dummy base64 string of the correct length
+                const dummyBase64 = "A".repeat(fileSizeKB * 1024 * base64Overhead);
+                payloadPart = { kind: "file", file: { name: "report.pdf", bytes: dummyBase64 } };
+                break;
+        }
+
+        // 2. Construct the full A2A JSON object
+        const a2aObject = {
+            jsonrpc: "2.0", id: "sim-req-1", method: "message/send",
+            params: { message: { role: "user", parts: [payloadPart] } }
+        };
+
+        const jsonString = JSON.stringify(a2aObject);
+        // Display a truncated version if it's a huge file
+        const displayJsonString = jsonString.length > 5000 ? JSON.stringify({...a2aObject, params: {...a2aObject.params, message: {...a2aObject.params.message, parts: [{...payloadPart, file: {...payloadPart.file, bytes: payloadPart.file.bytes.substring(0,100) + '...'}}]}}}, null, 2) : JSON.stringify(a2aObject, null, 2);
+        jsonPayloadView.textContent = displayJsonString;
+        
+        // 3. Calculate sizes and density
+        const payloadBytes = new Blob([jsonString]).size;
+        const overheadPerPacket = 58; // Simplified TCP/IP/Ethernet overhead
+        const maxPayloadPerPacket = 1442; // MTU (1500) - Headers (58)
+        
+        const numPackets = Math.ceil(payloadBytes / maxPayloadPerPacket);
+        const totalOverhead = numPackets * overheadPerPacket;
+        const totalBytes = payloadBytes + totalOverhead;
+        const density = totalBytes > 0 ? (payloadBytes / totalBytes) * 100 : 0;
+        
+        payloadSizeEl.textContent = formatBytes(payloadBytes);
+        overheadSizeEl.textContent = formatBytes(totalOverhead);
+        totalSizeEl.textContent = formatBytes(totalBytes);
+        
+        densityBar.style.width = `${density.toFixed(1)}%`;
+        densityBar.textContent = `${density.toFixed(1)}%`;
+
+        // 4. Simulate transmission
+        const networkSpeedMbps = parseInt(networkSpeedSelect.value);
+        const networkSpeedBps = (networkSpeedMbps * 1000 * 1000) / 8; // Megabits to Bytes
+        const timeSeconds = totalBytes / networkSpeedBps;
+        const timeMilliseconds = timeSeconds * 1000;
+
+        transmissionTimeEl.textContent = timeMilliseconds < 1 ? '< 1 ms' : `${timeMilliseconds.toFixed(2)} ms`;
+        
+        // Animate the transmission bar
+        transmissionBar.style.width = '0%';
+        setTimeout(() => {
+            transmissionBar.style.width = '100%';
+            transmissionBar.style.transitionDuration = `${Math.min(timeMilliseconds, 2000)}ms`; // Cap animation at 2s for usability
+        }, 100);
+    }
+
+    // Event Listeners
+    partTypeSelect.addEventListener('change', runSimulation);
+    fileSizeSlider.addEventListener('input', runSimulation);
+    networkSpeedSelect.addEventListener('change', runSimulation);
+
+    // Initial run
+    runSimulation();
+
+</script>
+</body>
+</html>
