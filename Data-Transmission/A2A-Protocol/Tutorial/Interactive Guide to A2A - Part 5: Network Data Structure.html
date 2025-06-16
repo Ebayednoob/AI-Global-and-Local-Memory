@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Guide to A2A - Part 5: Network Data Structure</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc;
+        }
+        .card {
+            background-color: white;
+            border-radius: 0.75rem;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            padding: 1.5rem 2rem;
+            margin-bottom: 1.5rem;
+        }
+        .code-block {
+            background-color: #1e293b;
+            color: #e2e8f0;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            font-family: monospace;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            font-size: 0.875rem;
+        }
+        .layer-box {
+            border: 2px solid;
+            padding: 0.75rem;
+            border-radius: 0.5rem;
+            position: relative;
+        }
+        .layer-label {
+            position: absolute;
+            top: -0.8rem;
+            left: 0.5rem;
+            background-color: white;
+            padding: 0 0.5rem;
+            font-weight: 600;
+            font-size: 0.875rem;
+        }
+        .data-label {
+             font-family: monospace;
+             font-weight: 500;
+        }
+    </style>
+</head>
+<body class="text-slate-800 p-4 md:p-8">
+
+    <div class="max-w-5xl mx-auto">
+        <header class="text-center mb-10">
+            <h1 class="text-4xl font-bold text-blue-600">A2A Network Data Structure</h1>
+            <p class="mt-2 text-lg text-slate-600">Part 5: A Technical Dive into Packets and Data Density.</p>
+        </header>
+
+        <!-- Section 1: The Layered Model -->
+        <div class="card">
+            <h2 class="text-2xl font-semibold mb-2 text-blue-700">From JSON to Network Bits</h2>
+            <p class="mb-6">An A2A message starts as a simple JSON object. To travel across a network, it gets wrapped in several layers of headers, like a letter being put into an envelope, which is then put into a shipping box. Let's peel back these layers.</p>
+
+            <div class="space-y-4">
+                <!-- Ethernet Frame -->
+                <div class="layer-box border-slate-400">
+                    <span class="layer-label text-slate-500">Layer 2: Ethernet Frame</span>
+                    <div class="flex items-center gap-2">
+                         <div class="data-label bg-slate-200 p-2 rounded">ETH Hdr (14B)</div>
+                         <!-- IP Packet -->
+                         <div class="layer-box border-blue-400 flex-grow">
+                             <span class="layer-label text-blue-500">Layer 3: IP Packet</span>
+                             <div class="flex items-center gap-2">
+                                 <div class="data-label bg-blue-200 p-2 rounded">IP Hdr (20B)</div>
+                                 <!-- TCP Segment -->
+                                 <div class="layer-box border-green-400 flex-grow">
+                                     <span class="layer-label text-green-500">Layer 4: TCP Segment</span>
+                                      <div class="flex items-center gap-2">
+                                         <div class="data-label bg-green-200 p-2 rounded">TCP Hdr (20B)</div>
+                                         <!-- Application Data -->
+                                         <div class="layer-box border-red-400 flex-grow">
+                                             <span class="layer-label text-red-500">Layer 7: App Data</span>
+                                              <div class="data-label bg-red-200 p-2 rounded text-center">A2A JSON Payload</div>
+                                         </div>
+                                     </div>
+                                 </div>
+                             </div>
+                         </div>
+                         <div class="data-label bg-slate-200 p-2 rounded">ETH Trl (4B)</div>
+                    </div>
+                </div>
+            </div>
+             <p class="text-xs text-slate-500 mt-4"><strong>Note:</strong> This model simplifies things by omitting TLS encryption, which would add its own layer and overhead between TCP and the Application Data. All header sizes are typical minimums.</p>
+        </div>
+
+        <!-- Section 2: Interactive Data Density Calculator -->
+        <div class="card">
+            <h2 class="text-2xl font-semibold mb-2 text-blue-700">Interactive Data Density Calculator</h2>
+            <p class="mb-4">"Data Density" (or Payload Efficiency) tells us how much of a network packet is actual, useful information versus the overhead required to send it. A higher percentage is better. Modify the JSON payload below to see how its size impacts the overall efficiency.</p>
+            
+            <div class="grid md:grid-cols-2 gap-8">
+                <!-- Input Area -->
+                <div>
+                    <label for="json-payload-input" class="block font-medium mb-2">A2A JSON Payload:</label>
+                    <textarea id="json-payload-input" class="w-full h-64 font-mono text-sm p-2 border rounded-md bg-slate-50" spellcheck="false"></textarea>
+                </div>
+                <!-- Calculation Breakdown -->
+                <div>
+                    <h3 class="font-medium mb-2">Packet Size Breakdown:</h3>
+                    <div class="space-y-3 font-mono text-sm p-4 bg-slate-100 rounded-lg">
+                        <div class="flex justify-between">
+                            <span>Layer 7: JSON Payload Size:</span>
+                            <span id="payload-size" class="font-bold">0 Bytes</span>
+                        </div>
+                        <div class="flex justify-between border-t pt-3 mt-3">
+                            <span>Layer 4: TCP Header:</span>
+                            <span>+ 20 Bytes</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>Layer 3: IP Header:</span>
+                            <span>+ 20 Bytes</span>
+                        </div>
+                         <div class="flex justify-between">
+                            <span>Layer 2: Ethernet Header & Trailer:</span>
+                            <span>+ 18 Bytes</span>
+                        </div>
+                        <div class="flex justify-between border-t border-slate-400 pt-3 mt-3 font-bold text-base">
+                            <span>Total Packet Size:</span>
+                            <span id="total-size">58 Bytes</span>
+                        </div>
+                    </div>
+
+                    <h3 class="font-medium mb-2 mt-6">Payload Efficiency:</h3>
+                     <div class="w-full bg-gray-200 rounded-full h-6">
+                        <div id="efficiency-bar" class="bg-blue-600 h-6 text-xs font-medium text-blue-100 text-center p-1 leading-none rounded-full" style="width: 0%">
+                           <span id="efficiency-text">0%</span>
+                        </div>
+                    </div>
+                    <p class="text-xs text-center text-slate-500 mt-1">This shows the percentage of the total packet that is your actual data.</p>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        const jsonInput = document.getElementById('json-payload-input');
+        const payloadSizeEl = document.getElementById('payload-size');
+        const totalSizeEl = document.getElementById('total-size');
+        const efficiencyBar = document.getElementById('efficiency-bar');
+        const efficiencyText = document.getElementById('efficiency-text');
+
+        const defaultJson = {
+            "jsonrpc": "2.0",
+            "id": "req-weather-1",
+            "method": "message/send",
+            "params": {
+                "message": {
+                    "role": "user",
+                    "parts": [{
+                        "kind": "text",
+                        "text": "What is the weather in Boston, MA?"
+                    }]
+                }
+            }
+        };
+
+        const calculateDensity = () => {
+            const payloadString = jsonInput.value;
+            // In JavaScript, string length is characters. For byte size, we need to handle multi-byte characters.
+            // Blob provides a simple and accurate way to get the byte size of a UTF-8 string.
+            const payloadBytes = new Blob([payloadString]).size;
+
+            const tcpOverhead = 20;
+            const ipOverhead = 20;
+            const ethernetOverhead = 18; // 14 byte header + 4 byte trailer
+            const totalOverhead = tcpOverhead + ipOverhead + ethernetOverhead;
+
+            const totalBytes = payloadBytes + totalOverhead;
+            
+            const efficiency = totalBytes > 0 ? (payloadBytes / totalBytes) * 100 : 0;
+
+            // Update UI
+            payloadSizeEl.textContent = `${payloadBytes} Bytes`;
+            totalSizeEl.textContent = `${totalBytes} Bytes`;
+            
+            efficiencyBar.style.width = `${efficiency.toFixed(2)}%`;
+            efficiencyText.textContent = `${efficiency.toFixed(1)}%`;
+        };
+
+        jsonInput.addEventListener('input', calculateDensity);
+
+        // Initial setup
+        jsonInput.value = JSON.stringify(defaultJson, null, 2);
+        calculateDensity();
+    </script>
+</body>
+</html>
