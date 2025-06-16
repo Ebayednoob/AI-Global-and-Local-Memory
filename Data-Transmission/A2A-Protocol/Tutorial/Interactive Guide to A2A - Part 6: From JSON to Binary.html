@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Guide to A2A - Part 6: From JSON to Binary</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc;
+        }
+        .card {
+            background-color: white;
+            border-radius: 0.75rem;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            padding: 1.5rem 2rem;
+            margin-bottom: 1.5rem;
+        }
+        .step-label {
+            min-width: 130px;
+            font-weight: 600;
+        }
+        .data-view {
+            background-color: #1e293b;
+            color: #e2e8f0;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            font-family: monospace;
+            font-size: 0.9rem;
+            word-break: break-all;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .bit-view {
+            font-family: monospace;
+            font-size: 0.8rem;
+            line-height: 1.6;
+            word-break: break-all;
+            cursor: default;
+            transition: background-color 0.2s;
+        }
+        .bit-view span:hover {
+            background-color: #fef9c3; /* yellow-100 */
+            color: #1e293b;
+        }
+        .bit-label {
+            position: absolute;
+            background-color: #111827;
+            color: white;
+            padding: 0.5rem;
+            border-radius: 0.5rem;
+            font-size: 0.8rem;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            margin-bottom: 0.5rem;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.2s;
+            white-space: nowrap;
+            z-index: 10;
+        }
+        .bit-view span:hover .bit-label {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body class="text-slate-800 p-4 md:p-8">
+
+    <div class="max-w-6xl mx-auto">
+        <header class="text-center mb-10">
+            <h1 class="text-4xl font-bold text-blue-600">From JSON to Binary Bits</h1>
+            <p class="mt-2 text-lg text-slate-600">Part 6: An Interactive Journey to the Network Layer.</p>
+        </header>
+
+        <!-- Section 1: Interactive Breakdown -->
+        <div class="card">
+            <h2 class="text-2xl font-semibold mb-2 text-blue-700">Live Packet Encapsulation</h2>
+            <p class="mb-4">Enter a short message to see how it's transformed into a network frame. This simulation shows the first packet of the data stream.</p>
+            
+            <div class="mb-6">
+                <label for="message-input" class="block font-medium mb-1">1. User Message:</label>
+                <input type="text" id="message-input" value="Hello Agent!" class="w-full md:w-1/2 p-2 border rounded-md">
+            </div>
+
+            <div class="space-y-6">
+                <!-- JSON Payload -->
+                <div class="flex flex-col md:flex-row gap-4">
+                    <div class="step-label text-red-600">2. A2A JSON</div>
+                    <div class="data-view flex-grow" id="json-view"></div>
+                </div>
+                <!-- UTF-8 to Hex -->
+                <div class="flex flex-col md:flex-row gap-4">
+                    <div class="step-label text-yellow-600">3. UTF-8 Hex</div>
+                    <div class="data-view flex-grow" id="hex-view"></div>
+                </div>
+                <!-- Bit View -->
+                 <div class="flex flex-col md:flex-row gap-4">
+                    <div class="step-label text-green-600">4. TCP/IP Packet</div>
+                    <div class="data-view flex-grow p-4" id="bit-view-container">
+                        <p class="text-xs text-slate-400 mb-2">Hover over the bits below to see the different parts of a network packet.</p>
+                        <div class="bit-view" id="bit-view"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        const messageInput = document.getElementById('message-input');
+        const jsonView = document.getElementById('json-view');
+        const hexView = document.getElementById('hex-view');
+        const bitView = document.getElementById('bit-view');
+
+        const stringToHex = (str) => {
+            return str.split('').map(c => c.charCodeAt(0).toString(16).padStart(2, '0')).join('');
+        };
+        
+        const hexToBinary = (hex) => {
+             return hex.split('').map(i => parseInt(i, 16).toString(2).padStart(4, '0')).join('');
+        };
+        
+        const createBitSpan = (binaryData, label) => {
+            const container = document.createElement('span');
+            container.className = 'relative';
+            const text = document.createTextNode(binaryData);
+            const labelEl = document.createElement('div');
+            labelEl.className = 'bit-label';
+            labelEl.textContent = label;
+            container.appendChild(text);
+            container.appendChild(labelEl);
+            return container;
+        };
+
+        const updateViews = () => {
+            // 1. Get user message
+            const message = messageInput.value;
+
+            // 2. Create JSON object
+            const a2aObject = {
+                jsonrpc: "2.0", id: "req-1", method: "message/send",
+                params: { message: { role: "user", parts: [{ kind: "text", text: message }] } }
+            };
+            const jsonString = JSON.stringify(a2aObject);
+            jsonView.textContent = JSON.stringify(a2aObject, null, 2);
+
+            // 3. Convert to Hex
+            const hexString = stringToHex(jsonString);
+            hexView.textContent = hexString.replace(/(.{2})/g, '$1 ').trim();
+
+            // 4. Create Bit View
+            bitView.innerHTML = ''; // Clear previous view
+
+            // Simulate Headers (fixed for this demo)
+            const ethHeaderHex = 'd8c0a6b1c2d3a4b5c6d7e8f90800'; // Dest MAC, Src MAC, Type (IP)
+            const ipHeaderHex = '4500003c1c4640004006bce5c0a80164c0a80101'; // Version, IHL, DSCP, Length, ID, Flags, TTL, Proto(TCP), Checksum, Src/Dest IP
+            const tcpHeaderHex = 'c4621f90000000010000000050022000fae00000'; // Src/Dest Port, Seq, Ack, Flags, Window, Checksum
+            
+            // For this demo, we'll just take the first few bytes of the payload to keep it clean
+            const payloadHexChunk = hexString.substring(0, 32); // first 16 bytes
+
+            const ethBinary = hexToBinary(ethHeaderHex);
+            const ipBinary = hexToBinary(ipHeaderHex);
+            const tcpBinary = hexToBinary(tcpHeaderHex);
+            const payloadBinary = hexToBinary(payloadHexChunk);
+
+            bitView.appendChild(createBitSpan(ethBinary, 'Layer 2: Ethernet Header (MAC Addresses)'));
+            bitView.appendChild(document.createTextNode(' '));
+            bitView.appendChild(createBitSpan(ipBinary, 'Layer 3: IP Header (IP Addresses)'));
+            bitView.appendChild(document.createTextNode(' '));
+            bitView.appendChild(createBitSpan(tcpBinary, 'Layer 4: TCP Header (Ports & Sequencing)'));
+            bitView.appendChild(document.createTextNode(' '));
+            bitView.appendChild(createBitSpan(payloadBinary, 'Layer 7: A2A JSON Payload (First 16 Bytes)'));
+
+            if (hexString.length > 32) {
+                 bitView.appendChild(document.createTextNode('...'));
+            }
+        };
+
+        messageInput.addEventListener('input', updateViews);
+
+        // Initial render
+        updateViews();
+    </script>
+</body>
+</html>
