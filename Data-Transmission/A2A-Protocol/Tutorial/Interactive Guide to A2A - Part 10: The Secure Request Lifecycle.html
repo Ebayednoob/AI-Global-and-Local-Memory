@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Guide to A2A - Part 10: The Secure Request Lifecycle</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc;
+        }
+        .card {
+            background-color: white;
+            border-radius: 0.75rem;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            padding: 1.5rem 2rem;
+            margin-bottom: 1.5rem;
+        }
+        .step {
+            opacity: 0.4;
+            transition: opacity 0.4s ease-in-out;
+            padding-bottom: 1rem;
+            border-left: 3px solid #cbd5e1;
+            padding-left: 1.5rem;
+        }
+        .step.active {
+            opacity: 1;
+            border-left-color: #3b82f6;
+        }
+        .code-block {
+            background-color: #1e293b;
+            color: #e2e8f0;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            font-family: monospace;
+            font-size: 0.8rem;
+            white-space: pre-wrap;
+            word-break: break-all;
+            position: relative;
+        }
+        .lock-overlay {
+            position: absolute;
+            inset: 0;
+            background-color: rgba(30, 41, 59, 0.9);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity 0.5s;
+            pointer-events: none;
+        }
+        .lock-overlay.visible {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body class="text-slate-800 p-4 md:p-8">
+
+    <div class="max-w-4xl mx-auto">
+        <header class="text-center mb-10">
+            <h1 class="text-4xl font-bold text-blue-600">The Secure Request Lifecycle</h1>
+            <p class="mt-2 text-lg text-slate-600">Part 10: Simulating an A2A request from creation to secure validation.</p>
+        </header>
+
+        <!-- Command Center -->
+        <div class="card text-center">
+            <h2 class="text-xl font-semibold mb-2">Security Simulation</h2>
+            <p class="text-slate-600 mb-4">Click through the steps to see how an A2A request is secured and validated.</p>
+            <div class="flex justify-center gap-4">
+                 <button id="prev-step-btn" class="bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold py-2 px-6 rounded-lg transition" disabled>Previous</button>
+                 <button id="next-step-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg transition">Next Step</button>
+            </div>
+        </div>
+
+        <!-- Simulation Steps -->
+        <div class="space-y-4">
+            <!-- Step 1: Client Creates Payload -->
+            <div id="step-1" class="step active">
+                <h3 class="text-lg font-semibold">Step 1: The A2A Client constructs the JSON payload.</h3>
+                <p class="text-sm text-slate-600 mb-2">This is the raw, unencrypted A2A message the agent wants to send.</p>
+                <div class="code-block">
+                    <pre id="code-1">
+{
+  "jsonrpc": "2.0",
+  "method": "message/send",
+  "id": "req-abc-123",
+  "params": {
+    "message": {
+      "role": "user",
+      "parts": [{"kind": "text", "text": "Book a flight to Tokyo"}]
+    }
+  }
+}
+                    </pre>
+                </div>
+            </div>
+
+            <!-- Step 2: Client Adds Auth Header -->
+             <div id="step-2" class="step">
+                <h3 class="text-lg font-semibold">Step 2: The Client adds the Authentication Header.</h3>
+                <p class="text-sm text-slate-600 mb-2">Based on the server's Agent Card, the client adds an `Authorization` header. The data is still unencrypted at this stage.</p>
+                <div class="code-block">
+                    <pre id="code-2">
+<span class="text-yellow-300">POST /a2a/v1 HTTP/1.1</span>
+<span class="text-yellow-300">Host: flight-agent.com</span>
+<span class="text-yellow-300">Content-Type: application/json</span>
+<span class="text-green-300 font-bold">Authorization: Bearer &lt;a_very_long_jwt_token_string&gt;</span>
+
+{
+  "jsonrpc": "2.0",
+  "method": "message/send",
+  ...
+}
+                    </pre>
+                </div>
+            </div>
+
+            <!-- Step 3: TLS Encryption -->
+             <div id="step-3" class="step">
+                <h3 class="text-lg font-semibold">Step 3: The entire HTTP request is encrypted by TLS.</h3>
+                <p class="text-sm text-slate-600 mb-2">The web framework or OS encrypts everything—headers and body—into an unreadable ciphertext before sending it over the network. This prevents eavesdropping.</p>
+                <div class="code-block">
+                     <pre id="code-3">
+POST /a2a/v1 HTTP/1.1
+Host: flight-agent.com
+Content-Type: application/json
+Authorization: Bearer &lt;a_very_long_jwt_token_string&gt;
+
+{
+  "jsonrpc": "2.0",
+  "method": "message/send",
+  ...
+}
+                    </pre>
+                     <div id="lock-overlay-3" class="lock-overlay">
+                        <svg class="w-24 h-24 text-green-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" /></svg>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Step 4: Server Decrypts & Validates -->
+             <div id="step-4" class="step">
+                <h3 class="text-lg font-semibold">Step 4: The A2A Server decrypts the request and validates authentication.</h3>
+                <p class="text-sm text-slate-600 mb-2">The server receives the ciphertext, decrypts it with the TLS session key, and can now read the headers and the JSON. Its first action is to validate the `Authorization` token.</p>
+                 <div class="p-4 bg-slate-100 rounded-lg text-sm">
+                    <p><strong class="text-green-600">✅ [Server Log]</strong> TLS Decryption Successful.</p>
+                    <p id="auth-log-line" class="opacity-0 transition-opacity duration-500"><strong class="text-blue-600">... [Server Log]</strong> Validating `Authorization: Bearer ...` token...</p>
+                 </div>
+            </div>
+
+            <!-- Step 5: Access Granted -->
+             <div id="step-5" class="step">
+                <h3 class="text-lg font-semibold">Step 5: Access Granted. The Agent processes the request.</h3>
+                <p class="text-sm text-slate-600 mb-2">Only after the token is validated does the agent's application logic get to see the JSON payload and begin working on the task.</p>
+                <div class="p-4 bg-green-100 border border-green-300 rounded-lg text-sm">
+                    <p><strong class="text-green-700">✅ [Server Log]</strong> Authentication successful. User is 'user123'.</p>
+                    <p><strong class="text-green-700">✅ [Server Log]</strong> User is authorized for 'message/send' skill.</p>
+                    <p><strong class="text-green-700">... [Server Log]</strong> Processing task: "Book a flight to Tokyo"</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const prevBtn = document.getElementById('prev-step-btn');
+        const nextBtn = document.getElementById('next-step-btn');
+        const steps = document.querySelectorAll('.step');
+        let currentStep = 0;
+
+        function updateUI() {
+            steps.forEach((step, index) => {
+                const stepEl = document.getElementById(`step-${index + 1}`);
+                if (index <= currentStep) {
+                    stepEl.classList.add('active');
+                } else {
+                    stepEl.classList.remove('active');
+                }
+            });
+            
+            // Handle overlays and animations
+            const lockOverlay = document.getElementById('lock-overlay-3');
+            if(currentStep >= 2) {
+                lockOverlay.classList.add('visible');
+            } else {
+                lockOverlay.classList.remove('visible');
+            }
+            
+            const authLogLine = document.getElementById('auth-log-line');
+             if(currentStep >= 3) {
+                authLogLine.style.opacity = '1';
+            } else {
+                authLogLine.style.opacity = '0';
+            }
+
+            // Button states
+            prevBtn.disabled = currentStep === 0;
+            nextBtn.disabled = currentStep === steps.length - 1;
+        }
+
+        nextBtn.addEventListener('click', () => {
+            if (currentStep < steps.length - 1) {
+                currentStep++;
+                updateUI();
+            }
+        });
+        
+        prevBtn.addEventListener('click', () => {
+             if (currentStep > 0) {
+                currentStep--;
+                updateUI();
+            }
+        });
+
+        // Initial state
+        updateUI();
+    </script>
+</body>
+</html>
