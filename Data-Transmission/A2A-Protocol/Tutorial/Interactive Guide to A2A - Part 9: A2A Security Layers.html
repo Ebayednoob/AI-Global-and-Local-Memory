@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Guide to A2A - Part 9: A2A Security Layers</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc;
+        }
+        .card {
+            background-color: white;
+            border-radius: 0.75rem;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            padding: 1.5rem 2rem;
+            margin-bottom: 1.5rem;
+        }
+        .layer-box {
+            border: 2px solid;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            position: relative;
+        }
+        .layer-label {
+            position: absolute;
+            top: -0.8rem;
+            left: 0.5rem;
+            background-color: white;
+            padding: 0 0.5rem;
+            font-weight: 600;
+            font-size: 0.875rem;
+        }
+         .tab {
+            cursor: pointer;
+            padding: 0.5rem 1rem;
+            border-bottom: 3px solid transparent;
+            transition: all 0.2s;
+        }
+        .tab.active {
+            border-bottom-color: #3b82f6;
+            color: #2563eb;
+            font-weight: 600;
+        }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+    </style>
+</head>
+<body class="text-slate-800 p-4 md:p-8">
+
+    <div class="max-w-5xl mx-auto">
+        <header class="text-center mb-10">
+            <h1 class="text-4xl font-bold text-blue-600">A2A Security Layers</h1>
+            <p class="mt-2 text-lg text-slate-600">Part 9: From Transport Encryption to Application Authorization.</p>
+        </header>
+
+        <!-- Section 1: The Security Model -->
+        <div class="card">
+            <h2 class="text-2xl font-semibold mb-2 text-blue-700">A Layered Security Model</h2>
+            <p class="mb-6">The A2A protocol doesn't reinvent security. Instead, it builds on proven, industry-standard layers. TCP provides reliable data delivery, but not security. The security comes from the layers built on top of it.</p>
+
+            <div class="space-y-1">
+                <!-- Application Layer -->
+                <div class="layer-box border-purple-500">
+                    <span class="layer-label text-purple-600">A2A Application Layer</span>
+                     <div class="p-2">
+                        <h3 class="font-semibold">Authentication & Authorization</h3>
+                        <p class="text-sm">Determines <strong class="text-purple-700">WHO</strong> you are and <strong class="text-purple-700">WHAT</strong> you are allowed to do. Handled via API Keys, OAuth 2.0, etc., as declared in the Agent Card.</p>
+                    </div>
+                </div>
+                <!-- Security Layer -->
+                <div class="layer-box border-green-500">
+                    <span class="layer-label text-green-600">Security Layer (TLS/SSL)</span>
+                     <div class="p-2">
+                        <h3 class="font-semibold">Confidentiality & Integrity</h3>
+                        <p class="text-sm">Encrypts the data to prevent eavesdropping and ensures it hasn't been tampered with in transit. This is what turns HTTP into <strong class="text-green-700">HTTPS</strong>.</p>
+                    </div>
+                </div>
+                <!-- Transport Layer -->
+                <div class="layer-box border-blue-500">
+                    <span class="layer-label text-blue-600">Transport Layer (TCP)</span>
+                    <div class="p-2">
+                        <h3 class="font-semibold">Reliable Delivery</h3>
+                        <p class="text-sm">Ensures that all the packets of a message arrive in the correct order without errors. It provides a reliable connection but no encryption.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Section 2: Interactive Deep Dive -->
+        <div class="card">
+             <h2 class="text-2xl font-semibold mb-4 text-blue-700">Security in Practice</h2>
+             <div class="flex border-b border-slate-200">
+                <div class="tab active" onclick="showTab(event, 'tls')">Layer 1: The TLS Handshake</div>
+                <div class="tab" onclick="showTab(event, 'auth')">Layer 2: A2A Authentication</div>
+             </div>
+             
+             <!-- TLS Handshake Tab -->
+             <div class="tab-content active p-4" id="content-tls">
+                <h3 class="text-xl font-semibold">How TLS Secures the Channel</h3>
+                <p class="mb-4">Before any A2A data is sent, the A2A Client and Server perform a TLS handshake. This process uses public-key cryptography to establish a secure, encrypted channel.</p>
+                <ol class="list-decimal list-inside space-y-3 text-sm">
+                    <li><strong class="font-semibold">Client Hello:</strong> The Client says, "Hello, I want to talk securely. Here are the encryption methods I know."</li>
+                    <li><strong class="font-semibold">Server Hello & Certificate:</strong> The Server replies, "Great, let's use this specific method. Here is my digital certificate to prove I am who I say I am (e.g., `flight-agent.com`)."</li>
+                    <li><strong class="font-semibold">Certificate Verification:</strong> The Client checks the server's certificate with a trusted Certificate Authority (CA) to verify its identity and prevent man-in-the-middle attacks.</li>
+                    <li><strong class="font-semibold">Key Exchange:</strong> The Client and Server securely exchange a "session key." This is a symmetric key that will be used to encrypt all subsequent data for this session.</li>
+                    <li><strong class="font-semibold">Secure Channel Ready:</strong> All further communication, including the HTTP headers and the A2A JSON payload, is now fully encrypted.</li>
+                </ol>
+             </div>
+
+             <!-- Authentication Tab -->
+             <div class="tab-content p-4" id="content-auth">
+                 <h3 class="text-xl font-semibold">How the A2A Server Authenticates the Client</h3>
+                 <p class="mb-4">Once the channel is encrypted by TLS, the A2A Server still needs to know who the client is. This is where the application-level authentication defined in the <strong class="text-purple-700">Agent Card</strong> comes in.</p>
+                 <div class="grid md:grid-cols-2 gap-6 font-mono text-xs">
+                    <div>
+                        <h4 class="font-sans font-semibold text-base mb-2">1. Client Reads Agent Card</h4>
+                        <p class="font-sans text-sm mb-2">The client fetches the public Agent Card and sees it requires "Bearer" token authentication.</p>
+                        <pre class="bg-slate-100 p-2 rounded">
+"securitySchemes": {
+  "bearerAuth": {
+    "type": "http",
+    "scheme": "bearer",
+    "bearerFormat": "JWT"
+  }
+},
+"security": [
+  { "bearerAuth": [] }
+]
+                        </pre>
+                    </div>
+                     <div>
+                        <h4 class="font-sans font-semibold text-base mb-2">2. Client Gets Token & Makes Request</h4>
+                        <p class="font-sans text-sm mb-2">The client gets an OAuth 2.0 token from an identity provider and includes it in the HTTP `Authorization` header. This entire request is encrypted by TLS.</p>
+                        <pre class="bg-slate-100 p-2 rounded">
+POST /a2a/v1/message/send HTTP/1.1
+Host: flight-agent.com
+Content-Type: application/json
+Authorization: Bearer &lt;long_encrypted_jwt_token&gt;
+
+{
+  "jsonrpc": "2.0",
+  "method": "message/send",
+  ...
+}
+                        </pre>
+                    </div>
+                 </div>
+                 <p class="mt-6 text-sm">The A2A Server receives this request, decrypts it using the TLS session key, inspects the `Authorization` header, validates the JWT token, and only then processes the JSON payload. This ensures only authenticated and authorized clients can use its skills.</p>
+             </div>
+        </div>
+
+    </div>
+
+    <script>
+        function showTab(evt, tabName) {
+            // Hide all content
+            document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
+            // Deactivate all tabs
+            document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+
+            // Show selected content and activate tab
+            document.getElementById('content-' + tabName).style.display = 'block';
+            evt.currentTarget.classList.add('active');
+        }
+    </script>
+</body>
+</html>
