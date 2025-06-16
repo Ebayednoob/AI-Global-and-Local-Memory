@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Guide to A2A - Part 11: Animated Security Lifecycle</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc;
+        }
+        .card {
+            background-color: white;
+            border-radius: 0.75rem;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            padding: 1.5rem;
+        }
+        .packet {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 200px;
+            padding: 0.5rem;
+            border: 2px solid;
+            border-radius: 0.5rem;
+            background-color: white;
+            transition: all 1.5s ease-in-out;
+            z-index: 10;
+        }
+        .packet-header {
+            font-size: 0.75rem;
+            font-weight: bold;
+            text-align: center;
+            padding: 0.25rem;
+            border-bottom: 2px solid;
+        }
+        .packet-body {
+            font-family: monospace;
+            font-size: 0.7rem;
+            padding: 0.5rem;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        .log-box {
+            height: 150px;
+            background-color: #f1f5f9;
+            border-radius: 0.5rem;
+            padding: 0.75rem;
+            font-family: monospace;
+            font-size: 0.8rem;
+            overflow-y: auto;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body class="text-slate-800 p-4 md:p-8">
+
+    <div class="max-w-6xl mx-auto">
+        <header class="text-center mb-10">
+            <h1 class="text-4xl font-bold text-blue-600">Animated Security Lifecycle</h1>
+            <p class="mt-2 text-lg text-slate-600">Part 11: Watch an A2A request travel securely from client to server.</p>
+        </header>
+
+        <!-- Command Center -->
+        <div class="card text-center max-w-lg mx-auto mb-8">
+            <h2 class="text-xl font-semibold mb-2">Security Flow Animation</h2>
+            <button id="start-animation-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg transition">
+                ▶️ Start Animation
+            </button>
+        </div>
+
+        <!-- Simulation Area -->
+        <div id="simulation-area" class="relative bg-slate-200 h-64 rounded-lg overflow-hidden">
+            <!-- Packet will be injected here -->
+            <div class="absolute top-4 left-4 text-center">
+                <h3 class="font-bold text-lg">🤖 A2A Client</h3>
+                <div id="client-status" class="status-badge bg-gray-300 text-gray-800">Idle</div>
+            </div>
+             <div class="absolute top-4 right-4 text-center">
+                <h3 class="font-bold text-lg">⚙️ A2A Server</h3>
+                <div id="server-status" class="status-badge bg-gray-300 text-gray-800">Idle</div>
+            </div>
+        </div>
+        
+        <!-- Log Views -->
+        <div class="mt-8 grid md:grid-cols-2 gap-8">
+            <div class="card">
+                <h3 class="font-semibold text-lg mb-2">Client-Side Log</h3>
+                <div class="log-box" id="client-log"><p>// Logs will appear here</p></div>
+            </div>
+            <div class="card">
+                <h3 class="font-semibold text-lg mb-2">Server-Side Log</h3>
+                <div class="log-box" id="server-log"><p>// Logs will appear here</p></div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        const startBtn = document.getElementById('start-animation-btn');
+        const simArea = document.getElementById('simulation-area');
+        const clientLog = document.getElementById('client-log');
+        const serverLog = document.getElementById('server-log');
+        const clientStatus = document.getElementById('client-status');
+        const serverStatus = document.getElementById('server-status');
+        
+        const delay = (ms) => new Promise(res => setTimeout(res, ms));
+
+        function logTo(element, message, color = 'text-slate-500') {
+            element.innerHTML += `<p class="${color}">${message}</p>`;
+            element.scrollTop = element.scrollHeight;
+        }
+
+        function setStatus(element, text, bgColor, textColor) {
+            element.textContent = text;
+            element.className = `status-badge ${bgColor} ${textColor}`;
+        }
+
+        startBtn.addEventListener('click', async () => {
+            startBtn.disabled = true;
+            startBtn.textContent = '▶️ Running...';
+
+            // --- Reset UI ---
+            clientLog.innerHTML = '';
+            serverLog.innerHTML = '';
+            simArea.querySelector('.packet')?.remove();
+            setStatus(clientStatus, 'Idle', 'bg-gray-300', 'text-gray-800');
+            setStatus(serverStatus, 'Idle', 'bg-gray-300', 'text-gray-800');
+            await delay(500);
+
+            // --- Step 1: Create Packet ---
+            logTo(clientLog, '1. Creating A2A JSON payload...');
+            setStatus(clientStatus, 'Building', 'bg-blue-200', 'text-blue-800');
+            const packet = document.createElement('div');
+            packet.className = 'packet border-blue-500';
+            packet.innerHTML = `<div class="packet-header border-blue-500 text-blue-600">A2A Request</div><div class="packet-body">{ "method": "...", "params": ... }</div>`;
+            packet.style.left = '25%';
+            simArea.appendChild(packet);
+            await delay(1500);
+
+            // --- Step 2: Add Auth Header ---
+            logTo(clientLog, '2. Adding Authorization header...');
+            packet.className = 'packet border-purple-500';
+            packet.innerHTML = `<div class="packet-header border-purple-500 text-purple-600">HTTP Request</div><div class="packet-body">Authorization: Bearer ...\n\n{ "method": "...", ... }</div>`;
+            await delay(1500);
+            
+            // --- Step 3: TLS Handshake & Encrypt ---
+            logTo(clientLog, '3. Performing TLS handshake with server...');
+            setStatus(clientStatus, 'Handshaking', 'bg-yellow-200', 'text-yellow-800');
+            await delay(1000);
+            logTo(clientLog, '4. Encrypting entire request with TLS...');
+            setStatus(clientStatus, 'Encrypting', 'bg-yellow-200', 'text-yellow-800');
+            packet.className = 'packet border-green-500';
+            packet.innerHTML = `<div class="packet-header border-green-500 text-green-600">HTTPS Packet (Encrypted)</div><div class="packet-body flex items-center justify-center h-full text-green-400"><svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg></div>`;
+            await delay(1000);
+            
+            // --- Step 4: Transmit Packet ---
+            logTo(clientLog, '5. Sending packet over network...');
+            setStatus(clientStatus, 'Sending', 'bg-blue-200', 'text-blue-800');
+            packet.style.left = '75%';
+            await delay(1500); // Network travel time
+            setStatus(clientStatus, 'Sent', 'bg-gray-300', 'text-gray-800');
+            
+            // --- Step 5: Server Receives & Decrypts ---
+            logTo(serverLog, '1. Received encrypted packet...');
+            setStatus(serverStatus, 'Decrypting', 'bg-yellow-200', 'text-yellow-800');
+            packet.className = 'packet border-purple-500';
+            packet.innerHTML = `<div class="packet-header border-purple-500 text-purple-600">HTTP Request</div><div class="packet-body">Authorization: Bearer ...\n\n{ "method": "...", ... }</div>`;
+            await delay(1500);
+
+            // --- Step 6: Server Authenticates ---
+            logTo(serverLog, '2. TLS decryption complete. Validating token...');
+            setStatus(serverStatus, 'Authenticating', 'bg-blue-200', 'text-blue-800');
+            await delay(1500);
+            logTo(serverLog, '3. Token valid. Access granted.', 'text-green-600 font-bold');
+            
+            // --- Step 7: Server Processes Request ---
+            logTo(serverLog, '4. Passing payload to agent logic...');
+            setStatus(serverStatus, 'Processing', 'bg-purple-200', 'text-purple-800');
+            packet.className = 'packet border-blue-500';
+            packet.innerHTML = `<div class="packet-header border-blue-500 text-blue-600">A2A Request</div><div class="packet-body">{ "method": "...", "params": ... }</div>`;
+            await delay(1500);
+            setStatus(serverStatus, 'Done', 'bg-green-200', 'text-green-800');
+            packet.style.opacity = '0';
+            
+            // --- Finish ---
+            startBtn.disabled = false;
+            startBtn.textContent = '▶️ Replay Animation';
+        });
+    </script>
+</body>
+</html>
