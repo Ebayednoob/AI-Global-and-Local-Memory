@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Guide to A2A - Part 3: Implementation Blueprint</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc;
+        }
+        .card {
+            background-color: white;
+            border-radius: 0.75rem;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            padding: 1.5rem 2rem;
+            margin-bottom: 1.5rem;
+        }
+        .code-block {
+            background-color: #1e293b;
+            color: #e2e8f0;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            font-family: monospace;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            font-size: 0.875rem;
+        }
+        .code-block .comment {
+            color: #94a3b8; /* slate-400 */
+        }
+        .code-block .keyword {
+            color: #93c5fd; /* blue-300 */
+        }
+        .code-block .function {
+            color: #a7f3d0; /* emerald-200 */
+        }
+        .code-block .string {
+            color: #fde047; /* yellow-300 */
+        }
+        h2, h3 {
+            letter-spacing: -0.025em;
+        }
+    </style>
+</head>
+<body class="text-slate-800 p-4 md:p-8">
+
+    <div class="max-w-5xl mx-auto">
+        <header class="text-center mb-10">
+            <h1 class="text-4xl font-bold text-blue-600">A2A Implementation Blueprint</h1>
+            <p class="mt-2 text-lg text-slate-600">Part 3: Pseudocode for Building A2A Agents.</p>
+        </header>
+
+        <!-- A2A Server Implementation -->
+        <div class="card">
+            <h2 class="text-2xl font-semibold mb-4 text-blue-700">Implementing an A2A Server (Remote Agent)</h2>
+            <p class="mb-6">The Server's primary job is to listen for HTTP requests, advertise its capabilities via an Agent Card, process tasks, and manage their state. Here's a conceptual blueprint.</p>
+            <div class="code-block">
+<pre>
+<span class="comment">// Define the Agent's capabilities in a static AgentCard object</span>
+<span class="keyword">CONSTANT</span> AGENT_CARD = {
+  "name": "Weather Reporter Agent",
+  "url": "https://my-weather-agent.com/a2a",
+  "skills": [{ "id": "get_forecast", "name": "Get Weather Forecast", ... }]
+  ...
+}
+
+<span class="comment">// Define a data store for tasks (can be a database, in-memory dictionary, etc.)</span>
+<span class="keyword">VARIABLE</span> task_database = {}
+
+<span class="comment">// Setup an HTTP server (e.g., using Flask, Express, ASP.NET)</span>
+<span class="keyword">FUNCTION</span> main():
+  http_server = new HTTPServer()
+
+  <span class="comment">// 1. Create an endpoint to serve the Agent Card</span>
+  http_server.add_route(<span class="string">"GET"</span>, <span class="string">"/.well-known/agent.json"</span>, <span class="function">serve_agent_card</span>)
+  
+  <span class="comment">// 2. Create the main A2A endpoint for RPC calls</span>
+  http_server.add_route(<span class="string">"POST"</span>, <span class="string">"/a2a"</span>, <span class="function">handle_a2a_request</span>)
+
+  http_server.listen_on_port(8080)
+<span class="keyword">END FUNCTION</span>
+
+<span class="comment">// Handler for serving the agent card</span>
+<span class="keyword">FUNCTION</span> serve_agent_card(request):
+  <span class="keyword">RETURN</span> Response(status=200, body=json(AGENT_CARD))
+<span class="keyword">END FUNCTION</span>
+
+<span class="comment">// Main handler for all A2A methods</span>
+<span class="keyword">FUNCTION</span> handle_a2a_request(request):
+  <span class="comment">// Parse the incoming JSON-RPC request body</span>
+  json_rpc_request = json.parse(request.body)
+  
+  <span class="keyword">SWITCH</span> json_rpc_request.method:
+    <span class="keyword">CASE</span> <span class="string">"message/send"</span>:
+      <span class="keyword">RETURN</span> handle_message_send(json_rpc_request)
+    <span class="keyword">CASE</span> <span class="string">"tasks/get"</span>:
+      <span class="keyword">RETURN</span> handle_tasks_get(json_rpc_request)
+    <span class="comment">// ... other cases for tasks/cancel, etc.</span>
+    <span class="keyword">DEFAULT</span>:
+      <span class="keyword">RETURN</span> JSONRPCError(code=-32601, message=<span class="string">"Method not found"</span>)
+  <span class="keyword">END SWITCH</span>
+<span class="keyword">END FUNCTION</span>
+
+<span class="comment">// Logic for handling a new message</span>
+<span class="keyword">FUNCTION</span> handle_message_send(request):
+  <span class="comment">// Create a new Task object</span>
+  new_task = new Task()
+  new_task.id = generate_uuid()
+  new_task.status.state = "submitted"
+
+  <span class="comment">// Store the task</span>
+  task_database[new_task.id] = new_task
+  
+  <span class="comment">// --- Asynchronous Part ---</span>
+  <span class="comment">// Start the actual work in the background so you can respond quickly</span>
+  <span class="keyword">RUN_IN_BACKGROUND</span>(<span class="function">process_the_task</span>, task_id=new_task.id, message=request.params.message)
+
+  <span class="comment">// Immediately return the created task object to the client</span>
+  json_rpc_response = { "jsonrpc": "2.0", "id": request.id, "result": new_task }
+  <span class="keyword">RETURN</span> Response(status=200, body=json(json_rpc_response))
+<span class="keyword">END FUNCTION</span>
+
+<span class="comment">// The actual business logic of the agent</span>
+<span class="keyword">FUNCTION</span> process_the_task(task_id, message):
+  <span class="comment">// Update task state to 'working'</span>
+  task = task_database[task_id]
+  task.status.state = "working"
+  
+  <span class="comment">// ... DO THE ACTUAL WORK (e.g., call a weather API) ...</span>
+  result_data = call_weather_api(message.parts[0].text)
+
+  <span class="comment">// Create the result artifact</span>
+  final_artifact = new Artifact({
+    parts: [{ kind: "data", data: result_data }]
+  })
+
+  <span class="comment">// Update the task with the final result</span>
+  task.artifacts.append(final_artifact)
+  task.status.state = "completed"
+<span class="keyword">END FUNCTION</span>
+
+</pre>
+            </div>
+        </div>
+
+        <!-- A2A Client Implementation -->
+        <div class="card">
+            <h2 class="text-2xl font-semibold mb-4 text-blue-700">Implementing an A2A Client</h2>
+            <p class="mb-6">The Client's role is to discover a server, understand its capabilities, and then make requests to it on behalf of a user or a larger system. It needs to know how to construct valid A2A requests and handle the responses.</p>
+            <div class="code-block">
+<pre>
+<span class="comment">// The URL of the target agent we want to talk to</span>
+<span class="keyword">CONSTANT</span> AGENT_URL = <span class="string">"https://my-weather-agent.com"</span>
+
+<span class="keyword">FUNCTION</span> main_client_logic():
+  <span class="comment">// --- 1. Discovery Phase ---</span>
+  <span class="comment">// Fetch the Agent Card to learn about the server</span>
+  agent_card_response = http.get(AGENT_URL + <span class="string">"/.well-known/agent.json"</span>)
+  <span class="keyword">IF</span> agent_card_response.status != 200:
+    <span class="function">handle_error</span>(<span class="string">"Could not fetch Agent Card"</span>)
+  
+  agent_card = json.parse(agent_card_response.body)
+  a2a_endpoint = agent_card.url <span class="comment">// e.g., "https://my-weather-agent.com/a2a"</span>
+
+  <span class="comment">// Find the specific skill we need from the card</span>
+  forecast_skill = find_skill_by_id(agent_card, <span class="string">"get_forecast"</span>)
+  <span class="keyword">IF</span> forecast_skill is NULL:
+    <span class="function">handle_error</span>(<span class="string">"Agent does not support forecasting"</span>)
+
+  <span class="comment">// --- 2. Task Initiation Phase ---</span>
+  <span class="comment">// User wants the weather for "Boston, MA"</span>
+  user_input = <span class="string">"Boston, MA"</span>
+  
+  <span class="comment">// Construct the A2A Message object</span>
+  message_to_send = new Message({
+    role: "user",
+    parts: [{ kind: "text", text: user_input }]
+  })
+
+  <span class="comment">// Construct the full JSON-RPC Request</span>
+  rpc_request = new JSONRPCRequest({
+    method: "message/send",
+    params: { message: message_to_send },
+    id: generate_request_id()
+  })
+
+  <span class="comment">// Send the request to the server's A2A endpoint</span>
+  task_response = http.post(a2a_endpoint, body=json(rpc_request))
+  task_result = json.parse(task_response.body).result
+
+  <span class="keyword">PRINT</span> <span class="string">"Task created with ID:"</span>, task_result.id
+  
+  <span class="comment">// --- 3. Polling for Result Phase ---</span>
+  <span class="keyword">LOOP</span> (for up to 30 seconds):
+    <span class="keyword">SLEEP</span>(2 seconds) <span class="comment">// Wait before polling</span>
+    
+    current_task_state = <span class="function">get_task_status</span>(a2a_endpoint, task_result.id)
+    
+    <span class="keyword">IF</span> current_task_state.status.state == <span class="string">"completed"</span>:
+      final_artifact = current_task_state.artifacts[0]
+      weather_data = final_artifact.parts[0].data
+      <span class="keyword">PRINT</span> <span class="string">"Weather in Boston:"</span>, weather_data
+      <span class="keyword">BREAK LOOP</span>
+    <span class="keyword">ELSE IF</span> current_task_state.status.state in [<span class="string">"failed"</span>, <span class="string">"canceled"</span>]:
+      <span class="function">handle_error</span>(<span class="string">"Task failed or was canceled"</span>)
+      <span class="keyword">BREAK LOOP</span>
+    <span class="keyword">ELSE</span>:
+      <span class="keyword">PRINT</span> <span class="string">"Task is still working..."</span>
+    <span class="keyword">END IF</span>
+  <span class="keyword">END LOOP</span>
+
+<span class="keyword">END FUNCTION</span>
+
+
+<span class="comment">// Helper function to poll a task's status</span>
+<span class="keyword">FUNCTION</span> get_task_status(endpoint, task_id):
+  rpc_request = new JSONRPCRequest({
+    method: "tasks/get",
+    params: { id: task_id },
+    id: generate_request_id()
+  })
+  response = http.post(endpoint, body=json(rpc_request))
+  <span class="keyword">RETURN</span> json.parse(response.body).result
+<span class="keyword">END FUNCTION</span>
+
+</pre>
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>
