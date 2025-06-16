@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive LLM Compression Tutorial</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            scroll-behavior: smooth;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .algo-content {
+            display: none;
+        }
+        .algo-content.active {
+            display: block;
+        }
+        .concept-card {
+            transition: transform 0.3s ease;
+        }
+        .concept-card:hover {
+            transform: translateY(-5px);
+        }
+        .slide-in {
+            animation: slide-in 0.5s forwards;
+        }
+        @keyframes slide-in {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        .algo-button.active {
+            background-color: #4f46e5;
+            color: white;
+            border-color: #4f46e5;
+        }
+        .algo-button {
+             transition: all 0.2s ease-in-out;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800">
+
+    <div class="container mx-auto p-4 md:p-8">
+        <header class="text-center mb-12 slide-in">
+            <h1 class="text-4xl md:text-5xl font-bold text-gray-900">Faster & Lighter LLMs: An Interactive Guide</h1>
+            <p class="mt-4 text-lg text-gray-600 max-w-3xl mx-auto">Based on the survey "Faster and Lighter LLMs: A Survey on Current Challenges and Way Forward"</p>
+        </header>
+
+        <nav class="flex justify-center mb-10 border-b border-gray-200 flex-wrap">
+            <button onclick="showTab('concepts')" class="tab-button active-tab text-lg font-medium py-3 px-6 text-indigo-600 border-b-2 border-indigo-600">Core Concepts</button>
+            <button onclick="showTab('math')" class="tab-button text-lg font-medium py-3 px-6 text-gray-500 hover:text-indigo-600">The Math</button>
+            <button onclick="showTab('protocols')" class="tab-button text-lg font-medium py-3 px-6 text-gray-500 hover:text-indigo-600">Protocol Comparison</button>
+        </nav>
+        
+        <main id="main-content">
+            <!-- Core Concepts Tab -->
+            <div id="concepts" class="tab-content active">
+                <section class="space-y-12">
+                    <!-- Architecture Pruning -->
+                    <div class="bg-white p-8 rounded-xl shadow-lg border border-gray-200 slide-in">
+                        <h2 class="text-3xl font-bold text-gray-900 mb-4">1. Architecture Pruning</h2>
+                        <p class="mb-6 text-gray-600 text-base leading-relaxed">Pruning systematically removes less important parts of a neural network to make it smaller and faster. The challenge is to identify which parts to remove without significantly harming performance.</p>
+                        
+                        <div class="mt-8" data-section="pruning">
+                            <h3 class="text-2xl font-bold text-gray-800 mb-4">Interactive Pruning Simulation</h3>
+                             <p class="text-sm text-gray-600 mb-4">Select an algorithm and use the slider to adjust the sparsity. Observe the trade-off between model size (Weight Memory) and performance (Perplexity - lower is better).</p>
+                            
+                            <div class="flex border-b border-gray-200 mb-4 flex-wrap">
+                                <button onclick="showAlgorithm('pruning', 'llm-pruner-algo')" class="algo-button active py-2 px-4 font-medium text-sm rounded-t-lg">LLM-Pruner</button>
+                                <button onclick="showAlgorithm('pruning', 'flap-algo')" class="algo-button py-2 px-4 font-medium text-sm rounded-t-lg">FLaP</button>
+                                <button onclick="showAlgorithm('pruning', 'wanda')" class="algo-button py-2 px-4 font-medium text-sm rounded-t-lg">Wanda-SP</button>
+                            </div>
+
+                            <div class="bg-gray-50 p-6 rounded-b-lg rounded-r-lg border border-gray-200">
+                                <div class="grid md:grid-cols-2 gap-8 items-center">
+                                    <div>
+                                        <label for="pruningSparsity" class="font-medium">Sparsity Level: <span id="sparsityValue" class="font-bold text-indigo-600">0%</span></label>
+                                        <input type="range" id="pruningSparsity" min="0" max="50" value="0" step="10" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer mt-2">
+                                        <div class="mt-6 grid grid-cols-2 gap-4 text-center">
+                                            <div class="bg-white p-4 rounded-lg shadow-sm">
+                                                <p class="text-sm text-gray-500">Weight Memory</p>
+                                                <p id="pruningWM" class="text-2xl font-bold text-indigo-600">12.55 GB</p>
+                                            </div>
+                                            <div class="bg-white p-4 rounded-lg shadow-sm">
+                                                <p class="text-sm text-gray-500">Perplexity</p>
+                                                <p id="pruningPerplexity" class="text-2xl font-bold text-red-500">12.62</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="h-[250px] bg-white p-2 rounded-lg shadow-inner">
+                                         <canvas id="pruningChart"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Quantization -->
+                    <div class="bg-white p-8 rounded-xl shadow-lg border border-gray-200 slide-in">
+                        <h2 class="text-3xl font-bold text-gray-900 mb-4">2. Quantization</h2>
+                        <div class="text-gray-600 text-base leading-relaxed space-y-4">
+                            <p>Quantization is the process of reducing the precision of the numbers used to represent a model's weights. Think of it like this: a high-precision number is like having a ruler with millimeter markings (e.g., `5.382 cm`). A low-precision number is like having a ruler that only shows whole centimeters (e.g., `5 cm`). You lose some fine detail, but the number is much simpler to write down and work with.</p>
+                            <p>In machine learning, models are typically trained using 32-bit or 16-bit floating-point numbers, which can represent a huge range of values with high precision. Quantization converts these numbers into smaller data types, most commonly 8-bit or 4-bit integers. This process involves two main steps:</p>
+                            <ol class="list-decimal list-inside space-y-2 pl-4">
+                                <li><strong>Scaling:</strong> The full range of high-precision values (e.g., from -15.0 to +15.0) is mapped to a much smaller range of integer values (e.g., from -128 to 127 for an 8-bit integer).</li>
+                                <li><strong>Rounding:</strong> Each high-precision weight is rounded to the nearest available integer in the new, smaller range.</li>
+                            </ol>
+                            <p>This reduction drastically shrinks the model's memory footprint and can significantly speed up calculations, especially on hardware that has specialized support for integer math.</p>
+                        </div>
+
+                        <h3 class="text-2xl font-bold text-gray-800 mb-4 mt-12">Interactive Comparison Chart</h3>
+                        
+                        <div class="grid md:grid-cols-2 gap-4 mb-4">
+                            <div class="bg-blue-50 border border-blue-200 p-4 rounded-lg">
+                                <h4 class="font-bold text-blue-800">What is Weight Memory?</h4>
+                                <p class="text-sm text-blue-700">Think of this as the model's file size. It's the amount of disk or memory space the model's parameters (weights) occupy. A smaller number means a lighter model that's faster to load and requires less expensive hardware.</p>
+                            </div>
+                            <div class="bg-red-50 border border-red-200 p-4 rounded-lg">
+                                <h4 class="font-bold text-red-800">What is Perplexity?</h4>
+                                <p class="text-sm text-red-700">This is a score of how "confused" the model is. A low score means the model is confident and effective at predicting text. A high score means it's confused and less accurate. For perplexity, **lower is better.**</p>
+                            </div>
+                        </div>
+
+                        <p class="text-sm text-gray-600 mb-4">This chart plots Perplexity vs. Weight Memory for different quantization methods on LLaMA2-7B. The ideal spot is the bottom-left corner: low memory usage and low perplexity (better performance).</p>
+                        <div class="bg-gray-100 p-4 rounded-lg h-[500px]">
+                            <canvas id="quantizationChart"></canvas>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <!-- The Math Tab -->
+            <div id="math" class="tab-content">
+                 <section class="space-y-8">
+                    <div class="bg-white p-8 rounded-xl shadow-lg border border-gray-200">
+                        <h2 class="text-3xl font-bold text-gray-900 mb-4">Sparsity</h2>
+                        <p class="text-gray-600 text-base leading-relaxed mb-4">Sparsity refers to the percentage of model parameters (weights) that have been removed or set to zero. A model with 50% sparsity means half of its original weights have been pruned away.</p>
+                        <div class="bg-indigo-50 p-6 rounded-lg border border-indigo-200">
+                             <h3 class="text-xl font-semibold text-indigo-800 mb-2">How it's Calculated</h3>
+                             <p class="text-indigo-700">It's a straightforward percentage calculation:</p>
+                             <div class="mt-4 p-4 bg-white rounded-lg font-mono text-center text-lg text-indigo-900 shadow-sm">
+                                Sparsity = $\frac{\text{Number of Zeroed-Out Weights}}{\text{Total Number of Weights}} \times 100\%$
+                             </div>
+                        </div>
+                    </div>
+                     <div class="bg-white p-8 rounded-xl shadow-lg border border-gray-200">
+                        <h2 class="text-3xl font-bold text-gray-900 mb-4">Perplexity</h2>
+                        <p class="text-gray-600 text-base leading-relaxed mb-4">Perplexity is a primary metric for evaluating language models. In simple terms, it measures how "surprised" or "confused" a model is by a sequence of text. A lower perplexity score indicates that the model was better at predicting the sample text, meaning it's a better language model. **Lower is better.**</p>
+                        <div class="bg-green-50 p-6 rounded-lg border border-green-200">
+                             <h3 class="text-xl font-semibold text-green-800 mb-2">The Mathematics Behind It</h3>
+                             <p class="text-green-700 mb-4">Perplexity is the exponential of the cross-entropy loss. For a sequence of tokens $W = (w_1, w_2, ..., w_N)$, it's calculated based on the probability the model assigns to that sequence.</p>
+                             <p class="text-green-700">It is the N-th root of the inverse of the sequence probability:</p>
+
+                             <div class="mt-4 p-4 bg-white rounded-lg font-mono text-center text-lg text-green-900 shadow-sm">
+                                PPL(W) = $\sqrt[N]{\frac{1}{P(w_1, w_2, ..., w_N)}} = P(W)^{-\frac{1}{N}}$
+                             </div>
+                              <p class="text-green-700 mt-4">Where $P(W)$ is the probability of the sequence calculated by the model. A higher probability for a correct sentence results in a lower perplexity score.</p>
+                        </div>
+                    </div>
+                 </section>
+            </div>
+            
+            <!-- Protocol Comparison Tab -->
+            <div id="protocols" class="tab-content">
+                <section class="bg-white p-8 rounded-xl shadow-lg border border-gray-200">
+                    <h2 class="text-3xl font-bold text-gray-900 mb-2">Protocol & Engine Comparison</h2>
+                     <p class="text-gray-600 mb-6">Compare different compression methods and inference engines. Select a protocol to see its details and performance metrics on LLaMA2-7B.</p>
+                    
+                    <div class="mb-6">
+                        <label for="protocolSelector" class="font-medium">Select a Protocol or Engine:</label>
+                        <select id="protocolSelector" class="w-full p-2 border border-gray-300 rounded-md mt-1">
+                            <option value="wanda">Wanda-SP (Pruning)</option>
+                            <option value="llm-pruner">LLM-Pruner (Pruning)</option>
+                            <option value="gptq">GPTQ (Quantization)</option>
+                            <option value="awq">AWQ (Quantization)</option>
+                            <option value="omni-quant">OmniQuant (Quantization)</option>
+                            <option value="tensorrt">TensorRT-LLM (Engine)</option>
+                            <option value="vllm">vLLM (Engine)</option>
+                        </select>
+                    </div>
+
+                    <div id="protocol-details" class="bg-gray-50 p-6 rounded-lg border border-gray-200">
+                        <h3 id="protocolName" class="text-2xl font-bold text-indigo-700">Wanda-SP</h3>
+                        <p id="protocolDescription" class="mt-2 mb-4 text-gray-700">A pruning method that removes weights based on the product of weight magnitudes and the norm of corresponding input activations. It's unique because it doesn't require any retraining or weight updates.</p>
+                        
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+                            <div class="bg-white p-4 rounded-lg shadow-sm">
+                                <p class="text-sm text-gray-500">Compression Type</p>
+                                <p id="protocolSparsity" class="text-xl font-bold text-gray-800">20% Pruning</p>
+                            </div>
+                            <div class="bg-white p-4 rounded-lg shadow-sm">
+                                <p class="text-sm text-gray-500">Tokens/s</p>
+                                <p id="protocolTokens" class="text-xl font-bold text-green-600">-</p>
+                            </div>
+                             <div class="bg-white p-4 rounded-lg shadow-sm">
+                                <p class="text-sm text-gray-500">Weight Memory (GB)</p>
+                                <p id="protocolWM" class="text-xl font-bold text-indigo-600">-</p>
+                            </div>
+                            <div class="bg-white p-4 rounded-lg shadow-sm">
+                                <p class="text-sm text-gray-500">Perplexity</p>
+                                <p id="protocolPerplexity" class="text-xl font-bold text-red-500">22.12</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" xintegrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzYCEh3UTeoVvGqdKOCkBIWoQIeUCfYDXFr" crossorigin="anonymous"></script>
+    <script>
+        // --- Data from the paper ---
+        const pruningData = {
+            'llm-pruner-algo': {
+                name: 'LLM-Pruner',
+                color: 'rgba(239, 68, 68, 0.7)',
+                points: { 0: { perplexity: 12.62, wm: 12.55 }, 10: { perplexity: 12.62, wm: 12.55 }, 20: { perplexity: 17.37, wm: 10.09 }, 30: { perplexity: 17.37, wm: 10.09 }, 40: { perplexity: 38.12, wm: 6.23 }, 50: { perplexity: 38.12, wm: 6.23 } }
+            },
+            'flap-algo': {
+                name: 'FLaP',
+                color: 'rgba(59, 130, 246, 0.7)',
+                points: { 0: { perplexity: 12.62, wm: 12.55 }, 10: { perplexity: 12.62, wm: 12.55 }, 20: { perplexity: 14.62, wm: 9.44 }, 30: { perplexity: 14.62, wm: 9.44 }, 40: { perplexity: 31.80, wm: 6.07 }, 50: { perplexity: 31.80, wm: 6.07 } }
+            },
+            'wanda': {
+                name: 'Wanda-SP',
+                color: 'rgba(34, 197, 94, 0.7)',
+                 points: { 0: { perplexity: 12.62, wm: 12.55 }, 10: { perplexity: 12.62, wm: 12.55 }, 20: { perplexity: 22.12, wm: 10.04 }, 30: { perplexity: 22.12, wm: 10.04 }, 40: { perplexity: 366.43, wm: 6.28 }, 50: { perplexity: 366.43, wm: 6.28 } }
+            }
+        };
+        const quantChartData = {
+            datasets: [
+                { label: 'GPTQ', data: [{x: 2.87, y: 7.36, label: "3-bit"}, {x: 3.63, y: 6.08, label: "4-bit"}, {x: 6.67, y: 5.86, label: "8-bit"}], backgroundColor: 'rgba(239, 68, 68, 0.7)', pointRadius: 8 },
+                { label: 'AWQ', data: [{x: 3.68, y: 6.02, label: "4-bit"}], backgroundColor: 'rgba(34, 197, 94, 0.7)', pointRadius: 8 },
+                { label: 'QLORA', data: [{x: 3.56, y: 6.02, label: "NF4"}], backgroundColor: 'rgba(234, 179, 8, 0.7)', pointRadius: 8 },
+                { label: 'OmniQuant', data: [{x: 3.20, y: 6.65, label: "3-bit"}, {x: 3.80, y: 5.97, label: "4-bit"}], backgroundColor: 'rgba(59, 130, 246, 0.7)', pointRadius: 8 },
+                { label: 'LLM.int8()', data: [{x: 6.58, y: 5.89, label: "8-bit"}], backgroundColor: 'rgba(168, 85, 247, 0.7)', pointRadius: 8 },
+                { label: 'Baseline FP16', data: [{x: 12.55, y: 5.85, label: "FP16"}], backgroundColor: 'rgba(107, 114, 128, 0.7)', pointRadius: 8 }
+            ]
+        };
+        const protocolData = {
+            'wanda': { name: 'Wanda-SP (Pruning)', desc: "A pruning method that removes weights based on the product of weight magnitudes and the norm of corresponding input activations. It's unique because it doesn't require any retraining or weight updates.", sparsity: '20% Pruning', tokens: '-', wm: '~10.0', perplexity: '22.12' },
+            'llm-pruner': { name: 'LLM-Pruner (Pruning)', desc: "Uses a Taylor series expansion to estimate the importance of structural groups in the LLM. It identifies dependencies between parameters to perform structured pruning.", sparsity: '20% Pruning', tokens: '32.57', wm: '10.09', perplexity: '17.37' },
+            'gptq': { name: 'GPTQ (Quantization)', desc: 'A post-training quantization (PTQ) method that uses second-order information (approximated Hessian) to quantize weights more accurately with minimal performance loss.', sparsity: '4-bit', tokens: '21.63', wm: '3.63', perplexity: '6.08' },
+            'awq': { name: 'AWQ (Quantization)', desc: 'Activation-aware Weight Quantization. It observes that not all weights are equally important and protects a small percentage of salient weights from quantization by analyzing activation magnitudes.', sparsity: '4-bit', tokens: '28.51', wm: '3.68', perplexity: '6.02' },
+            'omni-quant': { name: 'OmniQuant (Quantization)', desc: "An advanced quantization method that uses Learnable Weight Clipping (LWC) and Learnable Equivalent Transformation (LET) to handle outliers in both weights and activations.", sparsity: '4-bit', tokens: '134.2', wm: '3.80', perplexity: '5.97' },
+            'tensorrt': { name: 'TensorRT-LLM (Engine)', desc: "An inference engine from NVIDIA optimized for their GPUs. It uses techniques like fused operations, in-flight batching, and optimized kernels for different quantization types to achieve very high token generation rates.", sparsity: 'GPTQ 4-bit', tokens: '202.16', wm: '3.60', perplexity: '6.08' },
+            'vllm': { name: 'vLLM (Engine)', desc: "An inference engine that introduces PagedAttention, an algorithm inspired by virtual memory in operating systems. It manages the Key-Value cache more efficiently, allowing for higher throughput.", sparsity: 'GPTQ 4-bit', tokens: '172.88', wm: '3.63', perplexity: '6.08' }
+        };
+
+        // --- UI Logic ---
+        let contentRendered = {};
+        let quantizationChartInstance, pruningChartInstance;
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            
+            window.showTab = (tabId) => {
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                document.getElementById(tabId).classList.add('active');
+                document.querySelectorAll('.tab-button').forEach(b => {
+                    b.classList.remove('active-tab', 'text-indigo-600', 'border-indigo-600');
+                    b.classList.add('text-gray-500');
+                });
+                const activeButton = document.querySelector(`button[onclick="showTab('${tabId}')"]`);
+                activeButton.classList.add('active-tab', 'text-indigo-600', 'border-indigo-600');
+                activeButton.classList.remove('text-gray-500');
+
+                if(!contentRendered[tabId]) {
+                    if(tabId === 'concepts') {
+                        renderPruningChart();
+                        renderQuantizationChart();
+                    }
+                    if(tabId === 'math') {
+                        renderMath();
+                    }
+                    contentRendered[tabId] = true;
+                }
+            };
+            
+            window.showAlgorithm = (section, algoId) => {
+                const sectionContainer = document.querySelector(`[data-section='${section}']`);
+                if (!sectionContainer) return;
+                sectionContainer.querySelectorAll('.algo-button').forEach(b => b.classList.remove('active'));
+                sectionContainer.querySelector(`button[onclick="showAlgorithm('${section}', '${algoId}')"]`).classList.add('active');
+                if (section === 'pruning') updatePruningVisuals();
+            };
+
+            const renderQuantizationChart = () => {
+                 if (quantizationChartInstance) quantizationChartInstance.destroy();
+                 const quantCtx = document.getElementById('quantizationChart').getContext('2d');
+                 quantizationChartInstance = new Chart(quantCtx, { type: 'scatter', data: quantChartData, options: { responsive: true, maintainAspectRatio: false, scales: { x: { beginAtZero: true, title: { display: true, text: 'Weight Memory (GB)', font: { size: 14, weight: 'bold' } } }, y: { title: { display: true, text: 'Perplexity (Lower is Better)', font: { size: 14, weight: 'bold' } } } }, plugins: { tooltip: { callbacks: { label: (c) => `${c.dataset.label} (${c.raw.label}): (${c.parsed.x} GB, ${c.parsed.y} PPL)` } }, legend: { position: 'bottom' } } } });
+            }
+
+            const renderPruningChart = () => {
+                if (pruningChartInstance) pruningChartInstance.destroy();
+                const pruningCtx = document.getElementById('pruningChart').getContext('2d');
+                pruningChartInstance = new Chart(pruningCtx, {
+                    type: 'bar',
+                    data: { labels: ['Perplexity'], datasets: [] },
+                    options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', scales: { x: { beginAtZero: true } }, plugins: { legend: { display: false }, title: { display: true, text: 'Performance vs. Baseline' } } }
+                });
+                updatePruningVisuals();
+            }
+
+            const renderMath = () => {
+                document.querySelectorAll('.font-mono').forEach(el => {
+                   katex.render(el.textContent, el, { throwOnError: false, displayMode: true });
+                });
+            }
+
+            const getPruningDataForSparsity = (algo, sparsity) => {
+                const points = pruningData[algo].points;
+                return points[sparsity];
+            }
+
+            const updatePruningVisuals = () => {
+                const activeAlgoButton = document.querySelector('[data-section="pruning"] .algo-button.active');
+                if(!activeAlgoButton) return;
+                const activeAlgoId = activeAlgoButton.getAttribute('onclick').split("'")[3];
+                const sparsity = document.getElementById('pruningSparsity').value;
+                document.getElementById('sparsityValue').textContent = `${sparsity}%`;
+                
+                const data = getPruningDataForSparsity(activeAlgoId, parseInt(sparsity));
+                if (!data) return;
+
+                document.getElementById('pruningWM').textContent = `${data.wm.toFixed(2)} GB`;
+                document.getElementById('pruningPerplexity').textContent = data.perplexity.toFixed(2);
+                
+                if(!pruningChartInstance) return;
+                pruningChartInstance.data.datasets = [
+                    { label: 'Baseline', data: [pruningData[activeAlgoId].points[0].perplexity], backgroundColor: 'rgba(107, 114, 128, 0.7)'},
+                    { label: pruningData[activeAlgoId].name, data: [data.perplexity], backgroundColor: pruningData[activeAlgoId].color }
+                ];
+                pruningChartInstance.update();
+            };
+
+            document.getElementById('pruningSparsity').addEventListener('input', updatePruningVisuals);
+
+            const protocolSelector = document.getElementById('protocolSelector');
+            function updateProtocolDetails(protocol) {
+                const data = protocolData[protocol];
+                document.getElementById('protocolName').textContent = data.name;
+                document.getElementById('protocolDescription').textContent = data.desc;
+                document.getElementById('protocolSparsity').textContent = data.sparsity;
+                document.getElementById('protocolTokens').textContent = data.tokens;
+                document.getElementById('protocolWM').textContent = data.wm;
+                document.getElementById('protocolPerplexity').textContent = data.perplexity;
+            }
+            protocolSelector.addEventListener('change', (e) => updateProtocolDetails(e.target.value));
+            
+            // Initial state
+            showTab('concepts');
+            showAlgorithm('pruning','llm-pruner-algo');
+            showAlgorithm('quant','gptq-algo');
+            updateProtocolDetails('wanda');
+        });
+    </script>
+</body>
+</html>
