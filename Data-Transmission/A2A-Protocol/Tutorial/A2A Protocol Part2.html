@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Guide to A2A - Part 2: Protocol Data Objects</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc;
+        }
+        .card {
+            background-color: white;
+            border-radius: 0.75rem;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            padding: 1.5rem 2rem;
+            margin-bottom: 1.5rem;
+        }
+        .tab {
+            cursor: pointer;
+            padding: 0.75rem 1.25rem;
+            border-bottom: 3px solid transparent;
+            transition: all 0.2s;
+        }
+        .tab.active {
+            border-bottom-color: #3b82f6;
+            color: #2563eb;
+            font-weight: 600;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .code-block {
+            background-color: #1e293b;
+            color: #e2e8f0;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            font-family: monospace;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            font-size: 0.875rem;
+        }
+        .concept-corner {
+            background-color: #fefce8; /* yellow-50 */
+            border: 1px solid #facc15; /* yellow-400 */
+            border-radius: 0.5rem;
+            padding: 1rem;
+            margin-top: 1.5rem;
+        }
+    </style>
+</head>
+<body class="text-slate-800 p-4 md:p-8">
+
+    <div class="max-w-5xl mx-auto">
+        <header class="text-center mb-10">
+            <h1 class="text-4xl font-bold text-blue-600">A2A Deep Dive: Protocol Data Objects</h1>
+            <p class="mt-2 text-lg text-slate-600">Part 2: Deconstructing the building blocks of A2A communication.</p>
+        </header>
+
+        <div class="card">
+            <!-- Tabs for different data objects -->
+            <div class="flex border-b border-slate-200">
+                <div id="tab-task" class="tab active" onclick="showTab('task')">Task & TaskState</div>
+                <div id="tab-message" class="tab" onclick="showTab('message')">Message</div>
+                <div id="tab-part" class="tab" onclick="showTab('part')">Part (Content)</div>
+                <div id="tab-artifact" class="tab" onclick="showTab('artifact')">Artifact</div>
+            </div>
+
+            <!-- Task Content -->
+            <div id="content-task" class="tab-content active pt-6">
+                <h3 class="text-xl font-semibold mb-2">The `Task` Object: The Unit of Work</h3>
+                <p class="mb-4">The `Task` is the central object in A2A. It represents the entire lifecycle of a request, from initiation to completion. It acts as a state machine, tracking the current status and holding the final results (`Artifacts`).</p>
+                
+                <h4 class="font-semibold mt-6 mb-2">Interactive TaskState Explorer</h4>
+                <p class="text-sm text-slate-600 mb-4">Click a state to see how the `Task` object reflects the change.</p>
+                <div class="flex flex-wrap gap-2 mb-4">
+                    <button onclick="updateTaskState('submitted')" class="bg-slate-200 text-slate-700 px-3 py-1 rounded-full text-sm">submitted</button>
+                    <button onclick="updateTaskState('working')" class="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm">working</button>
+                    <button onclick="updateTaskState('input-required')" class="bg-yellow-100 text-yellow-700 px-3 py-1 rounded-full text-sm">input-required</button>
+                    <button onclick="updateTaskState('completed')" class="bg-green-100 text-green-700 px-3 py-1 rounded-full text-sm">completed</button>
+                    <button onclick="updateTaskState('failed')" class="bg-red-100 text-red-700 px-3 py-1 rounded-full text-sm">failed</button>
+                </div>
+
+                <div class="code-block">
+                    <pre id="task-object-output"></pre>
+                </div>
+
+                <div class="concept-corner">
+                    <h4 class="font-bold text-yellow-800">💡 Concept: Enumerated Types (Enums)</h4>
+                    <p class="text-yellow-900 mt-2 text-sm">The `TaskState` is an <strong class="font-semibold">enumeration</strong>, a concept from discrete mathematics and computer science. It defines a finite set of named values {`submitted`, `working`, `completed`, ...}. Using an enum instead of arbitrary strings prevents errors and ensures that the task's state is always one of the valid, predefined options, making the protocol robust and predictable.</p>
+                </div>
+            </div>
+
+            <!-- Message Content -->
+            <div id="content-message" class="tab-content pt-6">
+                 <h3 class="text-xl font-semibold mb-2">The `Message` Object: The Communication Turn</h3>
+                 <p class="mb-4">A `Message` represents a single turn in the conversation. It carries the instructions from a `user` (the client) or a response/update from an `agent` (the server). Its most important property is `parts`, which contains the actual content.</p>
+                 
+                 <div class="grid md:grid-cols-2 gap-6 items-start">
+                    <div>
+                        <h4 class="font-semibold mt-6 mb-2">Message Builder</h4>
+                        <label for="msg-role" class="block text-sm font-medium text-gray-700">Role</label>
+                        <select id="msg-role" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2">
+                            <option value="user">user (Client)</option>
+                            <option value="agent">agent (Server)</option>
+                        </select>
+
+                        <label for="msg-text" class="block text-sm font-medium text-gray-700 mt-4">Message Text</label>
+                        <textarea id="msg-text" rows="3" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2">Generate a sales report for Q1.</textarea>
+                    </div>
+                     <div class="mt-6 md:mt-12">
+                         <div class="code-block h-full">
+                            <pre id="message-object-output"></pre>
+                        </div>
+                     </div>
+                 </div>
+            </div>
+
+            <!-- Part Content -->
+            <div id="content-part" class="tab-content pt-6">
+                <h3 class="text-xl font-semibold mb-2">The `Part` Union Type: The Content Itself</h3>
+                <p class="mb-4">A `Message` or `Artifact` can contain multiple `Part` objects. This allows for rich, multi-modal content. A `Part` can be one of three kinds: `TextPart`, `FilePart`, or `DataPart`.</p>
+                
+                <div class="border rounded-lg p-4">
+                    <h4 class="font-semibold mb-2">Part Builder</h4>
+                    <div class="flex flex-wrap gap-2 mb-4">
+                         <button onclick="showPartType(event, 'text')" class="part-type-btn bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm">TextPart</button>
+                         <button onclick="showPartType(event, 'file')" class="part-type-btn bg-slate-200 text-slate-700 px-3 py-1 rounded-full text-sm">FilePart</button>
+                         <button onclick="showPartType(event, 'data')" class="part-type-btn bg-slate-200 text-slate-700 px-3 py-1 rounded-full text-sm">DataPart</button>
+                    </div>
+
+                    <div id="part-output" class="code-block">
+                        <pre id="part-object-output"></pre>
+                    </div>
+                </div>
+
+                <div id="file-concept-corner" class="concept-corner hidden">
+                    <h4 class="font-bold text-yellow-800">💡 Concept: Base64 Encoding</h4>
+                    <p class="text-yellow-900 mt-2 text-sm">The `bytes` in a `FilePart` are Base64 encoded. Since JSON only supports text, Base64 is a mathematical method to convert binary data (like images or PDFs) into a string of text. It works by taking 3 bytes (24 bits) of binary data and representing them as 4 characters from a 64-character set (A-Z, a-z, 0-9, +, /). This ensures that any file can be safely embedded and transported within a text-based format like JSON without data corruption.</p>
+                </div>
+            </div>
+            
+            <!-- Artifact Content -->
+            <div id="content-artifact" class="tab-content pt-6">
+                 <h3 class="text-xl font-semibold mb-2">The `Artifact` Object: The Final Result</h3>
+                 <p class="mb-4">An `Artifact` is a tangible output generated by the agent. It's the "deliverable" of a completed task. Like a `Message`, it contains one or more `Part` objects, allowing agents to return complex, multi-part results.</p>
+                 <div class="code-block">
+<pre>
+{
+  "artifactId": "artifact-q1-report-xyz",
+  "name": "Q1 Sales Report",
+  "description": "Comprehensive sales report for the first quarter.",
+  "parts": [
+    {
+      "kind": "text",
+      "text": "Here is the Q1 sales summary you requested."
+    },
+    {
+      "kind": "file",
+      "file": {
+        "name": "Q1-Report.pdf",
+        "mimeType": "application/pdf",
+        "uri": "https://storage.example.com/reports/q1.pdf"
+      }
+    },
+    {
+      "kind": "data",
+      "data": {
+        "totalSales": 157304.55,
+        "topRegion": "North America",
+        "growth": "15.2%"
+      }
+    }
+  ]
+}
+</pre>
+                 </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        // Tab functionality
+        const tabs = ['task', 'message', 'part', 'artifact'];
+        function showTab(tabName) {
+            tabs.forEach(tab => {
+                document.getElementById('content-' + tab).classList.remove('active');
+                document.getElementById('tab-' + tab).classList.remove('active');
+            });
+            document.getElementById('content-' + tabName).classList.add('active');
+            document.getElementById('tab-' + tabName).classList.add('active');
+        }
+
+        // Task Object Demo
+        const taskOutput = document.getElementById('task-object-output');
+        function updateTaskState(state) {
+            const taskObj = {
+                id: "task-12345-abc",
+                contextId: "ctx-98765-xyz",
+                status: {
+                    state: state,
+                    message: {
+                        role: "agent",
+                        parts: [{ kind: "text", text: `Task state is now ${state}.` }],
+                        messageId: "msg-" + Math.random().toString(16).slice(2)
+                    },
+                    timestamp: new Date().toISOString()
+                },
+                artifacts: state === 'completed' ? [{ artifactId: "artifact-final-result", parts: [{kind: 'text', text:'Final result data.'}] }] : [],
+                kind: "task"
+            };
+            taskOutput.textContent = JSON.stringify(taskObj, null, 2);
+        }
+
+        // Message Object Demo
+        const msgRole = document.getElementById('msg-role');
+        const msgText = document.getElementById('msg-text');
+        const msgOutput = document.getElementById('message-object-output');
+        function updateMessage() {
+            const msgObj = {
+                role: msgRole.value,
+                parts: [
+                    {
+                        kind: "text",
+                        text: msgText.value
+                    }
+                ],
+                messageId: "msg-" + Math.random().toString(16).slice(2),
+                taskId: "task-12345-abc",
+                contextId: "ctx-98765-xyz",
+                kind: "message"
+            };
+            msgOutput.textContent = JSON.stringify(msgObj, null, 2);
+        }
+        msgRole.addEventListener('change', updateMessage);
+        msgText.addEventListener('input', updateMessage);
+        
+        // Part Object Demo
+        const partOutput = document.getElementById('part-object-output');
+        const fileConceptCorner = document.getElementById('file-concept-corner');
+        function showPartType(event, type) {
+            // Handle button styling only if event is passed (i.e., from a click)
+            if (event && event.target) {
+                document.querySelectorAll('.part-type-btn').forEach(btn => {
+                    btn.classList.add('bg-slate-200', 'text-slate-700');
+                    btn.classList.remove('bg-blue-100', 'text-blue-700');
+                });
+                event.target.classList.remove('bg-slate-200', 'text-slate-700');
+                event.target.classList.add('bg-blue-100', 'text-blue-700');
+            }
+
+            let partObj = {};
+            fileConceptCorner.classList.add('hidden');
+
+            switch (type) {
+                case 'text':
+                    partObj = { kind: "text", text: "This is a plain text part." };
+                    break;
+                case 'file':
+                    partObj = {
+                        kind: "file",
+                        file: {
+                            name: "data.bin",
+                            mimeType: "application/octet-stream",
+                            bytes: "VGhpcyBpcyBkdW1teSBiaW5hcnkgZGF0YS4=" // "This is dummy binary data."
+                        }
+                    };
+                    fileConceptCorner.classList.remove('hidden');
+                    break;
+                case 'data':
+                    partObj = {
+                        kind: "data",
+                        data: {
+                            userId: 123,
+                            preferences: { theme: "dark", notifications: true },
+                            tags: ["alpha", "beta"]
+                        }
+                    };
+                    break;
+            }
+             partOutput.textContent = JSON.stringify(partObj, null, 2);
+        }
+
+        // Initial calls
+        updateTaskState('submitted');
+        updateMessage();
+        showPartType(null, 'text'); // Pass null for event on initial call
+
+    </script>
+</body>
+</html>
