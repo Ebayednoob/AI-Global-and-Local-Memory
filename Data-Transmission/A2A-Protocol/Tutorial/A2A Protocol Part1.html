@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Guide to A2A - Part 1: The Big Picture</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc;
+        }
+        .card {
+            background-color: white;
+            border-radius: 0.75rem;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            padding: 1.5rem 2rem;
+            margin-bottom: 1.5rem;
+        }
+        .step {
+            transition: all 0.3s ease-in-out;
+            border-left: 4px solid transparent;
+            padding-left: 1rem;
+            cursor: pointer;
+        }
+        .step.active {
+            border-left-color: #3b82f6;
+            background-color: #eff6ff;
+        }
+        .step-content {
+            display: none;
+        }
+        .step-content.active {
+            display: block;
+        }
+        .code-block {
+            background-color: #1e293b;
+            color: #e2e8f0;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            font-family: monospace;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            font-size: 0.875rem;
+        }
+    </style>
+</head>
+<body class="text-slate-800 p-4 md:p-8">
+
+    <div class="max-w-5xl mx-auto">
+        <header class="text-center mb-10">
+            <h1 class="text-4xl font-bold text-blue-600">A2A Protocol: The Big Picture</h1>
+            <p class="mt-2 text-lg text-slate-600">An interactive overview of the core concepts and lifecycle.</p>
+        </header>
+
+        <!-- Section 1: Core Concepts -->
+        <div class="card">
+            <h2 class="text-2xl font-semibold mb-4 text-blue-700">1. Core Concepts at a Glance</h2>
+            <p class="mb-6">The A2A protocol enables two agents, a <strong class="text-blue-600">Client</strong> and a <strong class="text-green-600">Server (Remote Agent)</strong>, to communicate. This interaction is orchestrated through a few key data objects. Click on a component below to see its role.</p>
+            <div class="flex flex-col md:flex-row items-center justify-around bg-slate-50 p-6 rounded-lg border">
+                <!-- A2A Client -->
+                <div class="text-center mb-4 md:mb-0">
+                    <div class="text-5xl mb-2">🤖</div>
+                    <div class="font-semibold text-blue-600">A2A Client</div>
+                    <p class="text-sm text-slate-500">Initiates requests</p>
+                </div>
+
+                <!-- Communication Flow -->
+                <div class="flex flex-col items-center font-mono text-sm space-y-2 text-center">
+                    <button onclick="showInfo('card')" class="bg-white border border-slate-300 rounded-md px-3 py-1 hover:bg-slate-100 transition">1. AgentCard</button>
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3" /></svg>
+                    <button onclick="showInfo('task')" class="bg-white border border-slate-300 rounded-md px-3 py-1 hover:bg-slate-100 transition">2. Task & Message</button>
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16l-4-4m0 0l4-4m-4 4h18" /></svg>
+                    <button onclick="showInfo('artifact')" class="bg-white border border-slate-300 rounded-md px-3 py-1 hover:bg-slate-100 transition">3. Artifact</button>
+                </div>
+
+                <!-- A2A Server -->
+                 <div class="text-center mt-4 md:mt-0">
+                    <div class="text-5xl mb-2">⚙️</div>
+                    <div class="font-semibold text-green-600">A2A Server</div>
+                    <p class="text-sm text-slate-500">Performs tasks</p>
+                </div>
+            </div>
+            <div id="info-box" class="mt-6 p-4 bg-blue-50 border-l-4 border-blue-500 rounded-r-lg min-h-[100px] transition">
+                <h3 id="info-title" class="font-semibold text-lg text-blue-800"></h3>
+                <p id="info-desc" class="text-slate-700 mt-1"></p>
+            </div>
+        </div>
+
+        <!-- Section 2: The A2A Lifecycle -->
+        <div class="card">
+            <h2 class="text-2xl font-semibold mb-6 text-blue-700">2. The A2A Lifecycle: A Step-by-Step Journey</h2>
+            <div class="flex flex-col md:flex-row gap-8">
+                <!-- Steps Navigator -->
+                <div class="w-full md:w-1/3">
+                    <div id="step-1" class="step active" onclick="showStep(1)">
+                        <h3 class="font-semibold">Step 1: Discovery</h3>
+                        <p class="text-sm text-slate-500">The client finds out what the server can do.</p>
+                    </div>
+                    <div id="step-2" class="step mt-4" onclick="showStep(2)">
+                        <h3 class="font-semibold">Step 2: Task Initiation</h3>
+                        <p class="text-sm text-slate-500">The client sends a request.</p>
+                    </div>
+                    <div id="step-3" class="step mt-4" onclick="showStep(3)">
+                        <h3 class="font-semibold">Step 3: Processing & Updates</h3>
+                        <p class="text-sm text-slate-500">The server works on the task.</p>
+                    </div>
+                    <div id="step-4" class="step mt-4" onclick="showStep(4)">
+                        <h3 class="font-semibold">Step 4: Completion & Results</h3>
+                        <p class="text-sm text-slate-500">The server delivers the final output.</p>
+                    </div>
+                </div>
+
+                <!-- Step Content -->
+                <div class="w-full md:w-2/3">
+                    <div id="step-content-1" class="step-content active">
+                        <h3 class="text-xl font-semibold mb-2">Discovery via Agent Card</h3>
+                        <p class="mb-4">The journey begins with the client fetching the server's <strong>Agent Card</strong>. This JSON file is a public resume, detailing the server's skills, communication protocols (like streaming), and security requirements.</p>
+                        <div class="code-block">
+<pre>{
+  "name": "GeoSpatial Route Planner Agent",
+  "url": "https://georoute-agent.example.com/a2a/v1",
+  "capabilities": { "streaming": true, "pushNotifications": true },
+  "skills": [
+    {
+      "id": "route-optimizer-traffic",
+      "name": "Traffic-Aware Route Optimizer",
+      "description": "Calculates the optimal driving route..."
+    }
+  ],
+  "securitySchemes": {
+     "google": { "type": "openIdConnect", ... }
+  }
+}
+</pre>
+                        </div>
+                    </div>
+                    <div id="step-content-2" class="step-content">
+                        <h3 class="text-xl font-semibold mb-2">Sending a Message</h3>
+                        <p class="mb-4">With the Agent Card's info, the client constructs a `message/send` request. This is a JSON-RPC call containing a `Message` object. The `Message` includes `parts`, which hold the actual content (text, files, or structured data).</p>
+                        <div class="code-block">
+<pre>// Client sends this request
+{
+  "jsonrpc": "2.0",
+  "id": "req-001",
+  "method": "message/send",
+  "params": {
+    "message": {
+      "role": "user",
+      "parts": [{ "kind": "text", "text": "Plan a route..." }]
+    }
+  }
+}
+</pre>
+                        </div>
+                    </div>
+                    <div id="step-content-3" class="step-content">
+                        <h3 class="text-xl font-semibold mb-2">Task Creation and State</h3>
+                        <p class="mb-4">The server receives the message and creates a `Task` to track the work. A task has a lifecycle, moving through states like `submitted`, `working`, and `input-required`. For long-running tasks, the client can poll using `tasks/get` or subscribe to real-time updates via `message/stream`.</p>
+                         <div class="code-block">
+<pre>// Server's initial response (if task is long-running)
+{
+  "jsonrpc": "2.0",
+  "id": "req-001",
+  "result": {
+    "id": "task-12345",
+    "status": {
+      "state": "working",
+      "message": { "role": "agent", "parts": [...] }
+    },
+    "kind": "task"
+  }
+}
+</pre>
+                        </div>
+                    </div>
+                    <div id="step-content-4" class="step-content">
+                        <h3 class="text-xl font-semibold mb-2">Delivering the Artifact</h3>
+                        <p class="mb-4">Once the task is `completed`, the server packages the results into one or more `Artifacts`. An artifact is a final output, like a generated report, an image, or structured JSON data. It's attached to the final `Task` object.</p>
+                        <div class="code-block">
+<pre>// Server's final task object
+{
+  ...,
+  "status": { "state": "completed" },
+  "artifacts": [
+    {
+      "artifactId": "artifact-abc",
+      "name": "OptimizedRoute.json",
+      "parts": [{ "kind": "data", "data": { ...route info... } }]
+    }
+  ]
+}
+</pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        const infoDetails = {
+            card: {
+                title: 'AgentCard',
+                desc: 'A JSON file that acts as a resume for the server agent. It describes its identity, skills, service endpoint, and security requirements.'
+            },
+            task: {
+                title: 'Task & Message',
+                desc: 'A Task is the fundamental unit of work. It is initiated by a Message from the client, which contains the user\'s instructions or data.'
+            },
+            artifact: {
+                title: 'Artifact',
+                desc: 'The final output generated by the agent as a result of a task. It can be a document, image, or structured data, and is composed of one or more "Parts".'
+            }
+        };
+
+        function showInfo(component) {
+            document.getElementById('info-title').textContent = infoDetails[component].title;
+            document.getElementById('info-desc').textContent = infoDetails[component].desc;
+        }
+
+        function showStep(stepNum) {
+            // Deactivate all steps and content
+            for (let i = 1; i <= 4; i++) {
+                document.getElementById('step-' + i).classList.remove('active');
+                document.getElementById('step-content-' + i).classList.remove('active');
+            }
+            // Activate the selected step and content
+            document.getElementById('step-' + stepNum).classList.add('active');
+            document.getElementById('step-content-' + stepNum).classList.add('active');
+        }
+
+        // Initialize default views
+        showInfo('card');
+        showStep(1);
+    </script>
+</body>
+</html>
